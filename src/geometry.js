@@ -89,13 +89,4 @@
     return { x: l.x, z: l.depth, leg: l.leg };
   };
 
-  /** Batas posisi exit point probe agar wedge tidak menabrak cap las atau keluar pelat. */
-  UT.probeLimits = function (w, dir) {
-    const wd = UT.CONFIG.wedge;
-    // dir = +1: probe di sisi kiri menghadap kanan
-    const xmin = -w.P + wd.back;
-    const xmax = w.capH > 0 ? -w.capHalf - wd.front - 0.5 : w.P - wd.front;
-    if (dir > 0) return { min: xmin, max: xmax };
-    return { min: -xmax, max: -xmin };
-  };
 })(typeof window !== 'undefined' ? window : globalThis);

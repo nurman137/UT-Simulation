@@ -14,13 +14,15 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Kursor A-scan tertaut ke penampang
 - [x] Unit test geometri dan fisika
 
-## v0.2 – Kalibrasi & evaluasi
-- [ ] Mode blok IIW/V1: cari probe index (R100) dan cek sudut probe
-- [ ] Mode blok V2: kalibrasi range (R25/R50)
-- [ ] Blok kalibrasi dasar ASME (SDH) dan perekaman titik DAC
-- [ ] Kurva DAC, reference level, dan gain scanning (+6 dB)
-- [ ] Evaluasi indikasi terhadap 20% / 50% / 100% DAC
-- [ ] Sizing panjang 6 dB drop (tampak atas sederhana) dan sizing tinggi
+## v0.2 – Kalibrasi & evaluasi ✅
+- [x] Mode blok IIW/V1: cari probe index (R100), kalibrasi zero/range (echo 100 & 200 mm), cek sudut (Ø50 + skala)
+- [x] Probe latihan dengan galat tersembunyi (exit point, sudut, zero)
+- [x] Blok kalibrasi dasar ASME (SDH ¼T, ½T, ¾T, diameter sesuai tebal) dan perekaman titik DAC
+- [x] Kurva DAC 100/50/20%, reference level (80% FSH), gain scanning (+6 dB)
+- [x] Pembacaan %DAC dan evaluasi ASME Sec. VIII Div. 1 App. 12
+- [x] Tampak atas + panjang cacat sepanjang las; sizing panjang dan tinggi 6 dB drop
+- [ ] Blok V2 (R25/R50) — ditunda; kalibrasi range sudah tercakup oleh R100 IIW
+- [ ] Koreksi transfer — ditunda
 
 ## v0.3 – Mode edukasi
 - [ ] Mode tutorial langkah demi langkah

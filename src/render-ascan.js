@@ -87,6 +87,48 @@
       if (gx0 >= L && gx0 <= L + w) ctx.fillText('A', gx0 + 2, gy - 4);
     }
 
+    // Kurva DAC (100%, 50% = −6 dB, 20% = −14 dB)
+    if (o.dacCurve && !rf) {
+      const lines = [[1, [], 2], [0.5, [7, 4], 1.4], [0.2, [2, 3], 1.4]];
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(L, T - 2, w, h + 4);
+      ctx.clip();
+      ctx.strokeStyle = '#ff7ad9';
+      lines.forEach(([f, dash, lw]) => {
+        ctx.setLineDash(dash);
+        ctx.lineWidth = lw;
+        ctx.beginPath();
+        let pen = false, lastX = 0, lastY = 0;
+        for (let c = 0; c <= w; c += 2) {
+          const sp = o.delay + (c / w) * o.range;
+          const a = o.dacCurve(sp);
+          if (a == null) { pen = false; continue; }
+          const x = L + c, y = yOf(Math.min(108, a * f));
+          if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y);
+          lastX = x; lastY = y;
+        }
+        ctx.stroke();
+        if (pen) {
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ff7ad9';
+          ctx.font = '10px system-ui, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${Math.round(f * 100)}%`, Math.min(L + w - 2, lastX + 22), lastY - 3);
+        }
+      });
+      ctx.setLineDash([]);
+      (o.dacPoints || []).forEach((p) => {
+        const x = L + ((p.sp - o.delay) / o.range) * w;
+        if (x < L || x > L + w) return;
+        ctx.fillStyle = '#ff7ad9';
+        ctx.beginPath();
+        ctx.arc(x, yOf(Math.min(108, p.amp)), 3, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
     // Trace: min/max per kolom piksel
     const d = o.disp, n = d.length;
     ctx.save();

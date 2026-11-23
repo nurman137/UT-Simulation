@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.1.0',
+    version: '0.2.0',
 
     // Material benda uji (v0.1: baja karbon saja)
     material: {
@@ -18,6 +18,8 @@
 
     // Setengah panjang pelat yang dimodelkan (pelat dari -P sampai +P terhadap sumbu las)
     plateHalfLength: 200,
+    // Panjang las yang dimodelkan searah sumbu las (y)
+    weldLength: 300,
 
     // Dimensi wedge probe (mm) relatif terhadap titik keluar berkas (exit point / probe index)
     wedge: { front: 10, back: 22, height: 16 },
@@ -39,6 +41,8 @@
     GRAIN_STRENGTH: 0.07,
 
     defaults: {
+      specimen: 'las',
+      probeY: 150,
       // Benda uji
       T: 20,
       bevelHalf: 30,

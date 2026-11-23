@@ -1,9 +1,11 @@
 /*
- * Penggambaran tampilan scanning: penampang pelat & las, cacat, berkas, probe.
+ * Penggambaran tampilan scanning: penampang benda uji (las atau blok kalibrasi),
+ * cacat, berkas, gate, dan probe.
  */
 (function (g) {
   'use strict';
   const UT = (g.UT = g.UT || {});
+  const DEG = Math.PI / 180;
 
   const COL = {
     bg: '#eef1f4',
@@ -19,32 +21,46 @@
     ray: '#0077cc',
     gate: 'rgba(255,140,0,0.9)',
     probe: '#2b3440',
-    probeFace: '#3d4a59',
     text: '#26303a',
     muted: '#6b7785',
     marker: '#00a86b',
     peak: '#ff8c00',
+    engrave: '#3a4652',
   };
 
-  /** Hitung transformasi tampilan agar las & probe terlihat, skala x = skala z. */
+  /** Posisi muka depan (xf) dan belakang (xb) wedge. */
+  UT.probeExtent = function (probeX, dir, H) {
+    const xf = probeX + dir * H.front;
+    return { xf, xb: xf - dir * UT.PROBE_BODY };
+  };
+
   /** Batas dunia (mm) yang perlu terlihat di tampilan scanning. */
-  UT.viewExtent = function (w, state, dir) {
+  UT.viewExtent = function (spec, state, dir, H) {
     const wd = UT.CONFIG.wedge;
-    const hs = w.T * Math.tan((state.angle * Math.PI) / 180);
+    const z0 = -(wd.height + 17), z1 = spec.T + 10;
+    if (spec.type !== 'las') {
+      return { x0: spec.xMin - 8, x1: spec.xMax + 8, z0, z1 };
+    }
+    const w = spec.weld;
+    const hs = w.T * Math.tan(state.angle * DEG);
     const skip = 2 * hs;
-    const near = skip + wd.back + 14;
+    const near = skip + UT.PROBE_BODY + 4;
     const far = Math.max(w.capHalf + 14, 0.45 * skip + 12);
     let x0 = dir > 0 ? -near : -far;
     let x1 = dir > 0 ? far : near;
-    const pA = state.probeX - dir * wd.back, pB = state.probeX + dir * wd.front;
-    x0 = Math.min(x0, Math.min(pA, pB) - 8);
-    x1 = Math.max(x1, Math.max(pA, pB) + 8);
-    return { x0, x1, z0: -(wd.height + 17), z1: w.T + 10 };
+    const e = UT.probeExtent(state.probeX, dir, H);
+    x0 = Math.min(x0, Math.min(e.xf, e.xb) - 8);
+    x1 = Math.max(x1, Math.max(e.xf, e.xb) + 8);
+    return { x0, x1, z0, z1 };
   };
 
-  /** Hitung transformasi tampilan agar las & probe terlihat, skala x = skala z. */
-  UT.computeView = function (cw, ch, w, state, dir) {
-    const { x0, x1, z0, z1 } = UT.viewExtent(w, state, dir);
+  /** Transformasi tampilan (skala x = skala z). */
+  UT.computeView = function (cw, ch, ext) {
+    const { x0, x1, z1 } = ext;
+    let z0 = ext.z0;
+    // sisakan ±38 px di atas probe untuk label, berapa pun skalanya
+    const s0 = Math.min(cw / (x1 - x0), ch / (z1 - z0));
+    z0 = Math.min(z0, -(UT.CONFIG.wedge.height + 9) - 38 / s0);
     const s = Math.min(cw / (x1 - x0), ch / (z1 - z0));
     const ox = (cw - (x1 - x0) * s) / 2 - x0 * s;
     const oz = (ch - (z1 - z0) * s) / 2 - z0 * s;
@@ -53,29 +69,56 @@
 
   UT.viewToWorld = (v, px, py) => ({ x: (px - v.ox) / v.s, z: (py - v.oz) / v.s });
 
-  /** Apakah posisi probe masih terlihat dengan nyaman di view. */
-  UT.probeInView = function (v, xp, dir) {
-    const wd = UT.CONFIG.wedge;
-    const a = xp - dir * wd.back, b = xp + dir * wd.front;
-    return Math.min(a, b) > v.x0 + 4 && Math.max(a, b) < v.x1 - 4;
+  /** Apakah probe masih terlihat dengan nyaman di view. */
+  UT.probeInView = function (v, probeX, dir, H) {
+    const e = UT.probeExtent(probeX, dir, H);
+    return Math.min(e.xf, e.xb) > v.x0 + 4 && Math.max(e.xf, e.xb) < v.x1 - 4;
   };
 
+  /**
+   * o: { spec, state, dir, H, derived, spMaxTrue, gate:{start,end} (SP alat),
+   *      peakSP, hoverSP (SP alat), userIndexX, angleUser, showTruth }
+   */
   UT.drawSection = function (ctx, v, o) {
-    const { weld: w, scene, state, dir } = o;
     const X = (x) => v.ox + x * v.s;
     const Z = (z) => v.oz + z * v.s;
-    const T = w.T;
 
     ctx.save();
     ctx.fillStyle = COL.bg;
     ctx.fillRect(0, 0, v.cw, v.ch);
 
-    // --- Pelat
-    const px0 = Math.max(-w.P, v.x0 - 5), px1 = Math.min(w.P, v.x1 + 5);
+    if (o.spec.type === 'las') drawWeld(ctx, v, o, X, Z);
+    else drawBlock(ctx, v, o, X, Z);
+
+    drawScale(ctx, v, X, Z, o.spec);
+
+    if (o.state.showDefects && o.spec.type === 'las') drawDefects(ctx, o.spec.scene, X, Z);
+
+    if (o.state.showBeam) drawBeam(ctx, o, X, Z, o.spMaxTrue);
+    drawSkipMarks(ctx, o, X, Z);
+
+    // Gate pada sinar menurut kalibrasi alat
+    if (o.gate) {
+      ctx.strokeStyle = COL.gate;
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.55;
+      strokeUserRay(ctx, o, X, Z, Math.max(0, o.gate.start), Math.max(0, o.gate.end));
+      ctx.globalAlpha = 1;
+    }
+    if (o.peakSP != null && o.peakSP > 0) drawMarker(ctx, o, X, Z, o.peakSP, COL.peak, 'diamond');
+    if (o.hoverSP != null && o.hoverSP > 0) drawMarker(ctx, o, X, Z, o.hoverSP, COL.marker, 'cross');
+
+    drawProbe(ctx, o, X, Z);
+    ctx.restore();
+  };
+
+  // ------------------------------------------------------------------ benda uji
+  function drawWeld(ctx, v, o, X, Z) {
+    const spec = o.spec, w = spec.weld, scene = spec.scene, T = w.T;
+    const px0 = Math.max(spec.xMin, v.x0 - 5), px1 = Math.min(spec.xMax, v.x1 + 5);
     ctx.fillStyle = COL.plate;
     ctx.fillRect(X(px0), Z(0), X(px1) - X(px0), Z(T) - Z(0));
 
-    // --- HAZ (pita tipis di luar garis fusi)
     const fusionPoly = (side, off) => [
       [side * (w.topHalf + off), 0],
       [side * (w.g + off), T - w.rf],
@@ -91,7 +134,6 @@
       ctx.fill();
     });
 
-    // --- Logam las (bevel V) + cap + root bead
     ctx.beginPath();
     ctx.moveTo(X(-w.capHalf), Z(0));
     if (w.capH > 0) ctx.quadraticCurveTo(X(0), Z(-2 * w.capH), X(w.capHalf), Z(0));
@@ -110,7 +152,6 @@
     ctx.fillStyle = COL.weld;
     ctx.fill();
 
-    // Garis lapisan las (estetika)
     ctx.save();
     ctx.clip();
     ctx.strokeStyle = COL.weldLine;
@@ -126,7 +167,6 @@
     }
     ctx.restore();
 
-    // Garis fusi
     ctx.strokeStyle = COL.fusion;
     ctx.lineWidth = 1.2;
     [-1, 1].forEach((side) => {
@@ -136,7 +176,6 @@
       ctx.stroke();
     });
 
-    // Tepi pelat
     ctx.strokeStyle = COL.plateEdge;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -144,11 +183,10 @@
     ctx.moveTo(X(w.capHalf), Z(0)); ctx.lineTo(X(px1), Z(0));
     ctx.moveTo(X(px0), Z(T)); ctx.lineTo(X(scene.rootBead ? -w.rootHalf : -w.g), Z(T));
     ctx.moveTo(X(scene.rootBead ? w.rootHalf : w.g), Z(T)); ctx.lineTo(X(px1), Z(T));
-    if (px0 === -w.P) { ctx.moveTo(X(-w.P), Z(0)); ctx.lineTo(X(-w.P), Z(T)); }
-    if (px1 === w.P) { ctx.moveTo(X(w.P), Z(0)); ctx.lineTo(X(w.P), Z(T)); }
+    if (px0 === spec.xMin) { ctx.moveTo(X(px0), Z(0)); ctx.lineTo(X(px0), Z(T)); }
+    if (px1 === spec.xMax) { ctx.moveTo(X(px1), Z(0)); ctx.lineTo(X(px1), Z(T)); }
     ctx.stroke();
 
-    // Sumbu las
     ctx.setLineDash([6, 4]);
     ctx.strokeStyle = 'rgba(40,50,60,0.45)';
     ctx.lineWidth = 1;
@@ -161,55 +199,85 @@
     ctx.font = '11px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('sumbu las', X(0), Z(T + 7.5));
+  }
 
-    // Skala mm di bawah pelat
-    drawScale(ctx, v, X, Z, T);
+  function drawBlock(ctx, v, o, X, Z) {
+    const spec = o.spec;
+    ctx.beginPath();
+    spec.outline.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Z(p[1])) : ctx.moveTo(X(p[0]), Z(p[1]))));
+    ctx.closePath();
+    ctx.fillStyle = COL.plate;
+    ctx.fill();
+    ctx.strokeStyle = COL.plateEdge;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
 
-    // --- Cacat
-    if (state.showDefects) drawDefects(ctx, scene, X, Z, v);
+    // Lubang
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    (spec.holes || []).forEach((h) => {
+      ctx.beginPath();
+      ctx.arc(X(h.x), Z(h.z), Math.max(2, h.r * v.s), 0, 2 * Math.PI);
+      ctx.fillStyle = '#f7f9fb';
+      ctx.fill();
+      ctx.strokeStyle = COL.plateEdge;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = COL.engrave;
+      const ly = h.r * v.s > 14 ? Z(h.z) + 4 : Z(h.z) - Math.max(2, h.r * v.s) - 5;
+      ctx.fillText(h.label, X(h.x), ly);
+    });
 
-    // --- Berkas & sinar
-    const sp = o.spMaxTrue;
-    if (state.showBeam) drawBeam(ctx, o, X, Z, sp);
-
-    // Penanda skip di permukaan
-    drawSkipMarks(ctx, o, X, Z);
-
-    // Gate pada sinar (posisi menurut kalibrasi alat)
-    if (o.gate) {
-      ctx.strokeStyle = COL.gate;
-      ctx.lineWidth = 4;
-      ctx.globalAlpha = 0.55;
-      strokeRaySegment(ctx, o, X, Z, o.gate.start, o.gate.end);
-      ctx.globalAlpha = 1;
+    const m = spec.marks || {};
+    if (m.r100Center != null) {
+      const cx = X(m.r100Center), cy = Z(0);
+      ctx.fillStyle = COL.engrave;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy); ctx.lineTo(cx - 4, cy + 7); ctx.lineTo(cx + 4, cy + 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('pusat R100', cx, cy + 34);
+      ctx.fillText('R100', X(m.r100Center + 72), Z(70));
     }
+    if (m.angleScale) {
+      ctx.strokeStyle = COL.engrave;
+      ctx.fillStyle = COL.engrave;
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 1;
+      // skala 1° di antara tanda utama
+      const h = UT.IIW.hole50;
+      for (let a = 40; a <= 75; a++) {
+        const x = h.x + h.z * Math.tan(a * DEG);
+        const major = a % 5 === 0;
+        ctx.beginPath();
+        ctx.moveTo(X(x), Z(0));
+        ctx.lineTo(X(x), Z(0) + (major ? 9 : 4));
+        ctx.stroke();
+        if (major) ctx.fillText(`${a}°`, X(x), Z(0) + 20);
+      }
+    }
+  }
 
-    // Penanda puncak gate & kursor A-scan
-    if (o.peakSP != null) drawMarker(ctx, o, X, Z, o.peakSP, COL.peak, 'diamond');
-    if (o.hoverSP != null) drawMarker(ctx, o, X, Z, o.hoverSP, COL.marker, 'cross');
-
-    // --- Probe
-    drawProbe(ctx, o, X, Z, v);
-
-    ctx.restore();
-  };
-
-  function drawScale(ctx, v, X, Z, T) {
+  function drawScale(ctx, v, X, Z, spec) {
     const step = v.s > 6 ? 5 : v.s > 2.5 ? 10 : 20;
-    const start = Math.ceil(v.x0 / step) * step;
+    const start = Math.ceil(Math.max(v.x0, spec.xMin) / step) * step;
+    const end = Math.min(v.x1, spec.xMax);
     ctx.strokeStyle = 'rgba(60,70,80,0.5)';
     ctx.fillStyle = COL.muted;
     ctx.lineWidth = 1;
     ctx.font = '10px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    const zb = T + 3.5;
-    for (let x = start; x <= v.x1; x += step) {
+    const zb = spec.T + 3.5;
+    for (let x = start; x <= end; x += step) {
       const major = Math.round(x) % (step * 2) === 0;
       ctx.beginPath();
       ctx.moveTo(X(x), Z(zb));
       ctx.lineTo(X(x), Z(zb) + (major ? 6 : 3));
       ctx.stroke();
-      if (major && Math.abs(x) > 1e-6) ctx.fillText(String(x), X(x), Z(zb) + 16);
+      if (major && !(spec.type === 'las' && Math.abs(x) < 1e-6)) ctx.fillText(String(x), X(x), Z(zb) + 16);
     }
   }
 
@@ -250,20 +318,29 @@
     });
   }
 
-  // Titik pada sumbu berkas (unfolded) dengan offset tegak lurus 'off', dilipat ke dalam pelat
+  // ------------------------------------------------------------------ berkas
+  // Titik pada berkas sebenarnya (sudut & exit point sebenarnya), offset tegak lurus 'off'
   function foldedPoint(o, sp, off) {
-    const th = (o.state.angle * Math.PI) / 180;
+    const th = o.H.angle * DEG;
     const sn = Math.sin(th), cs = Math.cos(th);
-    const xu = sp * sn + off * cs; // arah horizontal (relatif dir)
+    const xu = sp * sn + off * cs;
     const zu = sp * cs - off * sn;
-    const f = UT.foldDepth(Math.max(0, zu), o.weld.T);
+    const f = UT.foldDepth(Math.max(0, zu), o.spec.T);
     return { x: o.state.probeX + o.dir * xu, z: zu < 0 ? 0 : f.z };
   }
 
   function drawBeam(ctx, o, X, Z, spMax) {
     const pd = o.derived;
+    spMax = Math.max(1, spMax);
     const steps = Math.max(40, Math.ceil(spMax / 0.6));
     const h = spMax / steps;
+    ctx.save();
+    if (o.spec.outline) {
+      ctx.beginPath();
+      o.spec.outline.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Z(p[1])) : ctx.moveTo(X(p[0]), Z(p[1]))));
+      ctx.closePath();
+      ctx.clip();
+    }
     ctx.beginPath();
     for (let i = 0; i < steps; i++) {
       const a = i * h, b = (i + 1) * h;
@@ -279,39 +356,43 @@
     }
     ctx.fillStyle = COL.beam;
     ctx.fill('nonzero');
-
     ctx.strokeStyle = COL.ray;
     ctx.lineWidth = 1.5;
-    strokeRaySegment(ctx, o, X, Z, 0, spMax);
+    strokeRay(ctx, X, Z, o.spec.T, o.H.angle, o.state.probeX, o.dir, 0, spMax);
+    ctx.restore();
   }
 
-  function strokeRaySegment(ctx, o, X, Z, sp0, sp1) {
-    const th = (o.state.angle * Math.PI) / 180;
-    const T = o.weld.T;
-    const cs = Math.cos(th);
-    // titik-titik pecah di setiap pantulan
+  function strokeRay(ctx, X, Z, T, angle, x0, dir, sp0, sp1) {
+    const cs = Math.cos(angle * DEG);
     const pts = [sp0];
     const legLen = T / cs;
     for (let k = Math.ceil(sp0 / legLen + 1e-9); k * legLen < sp1; k++) pts.push(k * legLen);
     pts.push(sp1);
     ctx.beginPath();
     pts.forEach((s, i) => {
-      const p = UT.rayPoint(s, o.state.angle, T, o.state.probeX, o.dir);
+      const p = UT.rayPoint(s, angle, T, x0, dir);
       if (i === 0) ctx.moveTo(X(p.x), Z(p.z));
       else ctx.lineTo(X(p.x), Z(p.z));
     });
     ctx.stroke();
   }
 
+  // Segmen sinar menurut kalibrasi alat (tanda index & sudut terukur)
+  function strokeUserRay(ctx, o, X, Z, sp0, sp1) {
+    if (sp1 <= sp0) return;
+    strokeRay(ctx, X, Z, o.spec.T, o.angleUser, o.userIndexX, o.dir, sp0, sp1);
+  }
+
   function drawSkipMarks(ctx, o, X, Z) {
-    const T = o.weld.T;
-    const hs = T * Math.tan((o.state.angle * Math.PI) / 180);
+    if (o.spec.type !== 'las' && o.spec.T > 60) return;
+    const T = o.spec.T;
+    const hs = T * Math.tan(o.H.angle * DEG);
     const labels = ['½ skip', '1 skip', '1½ skip', '2 skip'];
     ctx.font = '10px system-ui, sans-serif';
     ctx.textAlign = 'center';
     for (let k = 1; k <= 4; k++) {
       const x = o.state.probeX + o.dir * k * hs;
-      if (Math.abs(x) > o.weld.P) break;
+      if (x < o.spec.xMin || x > o.spec.xMax) break;
       const z = k % 2 ? T : 0;
       ctx.fillStyle = 'rgba(0,119,204,0.9)';
       ctx.beginPath();
@@ -323,11 +404,10 @@
   }
 
   function drawMarker(ctx, o, X, Z, spUser, color, kind) {
-    const l = UT.locate(spUser, o.state.angle, o.weld.T, o.state.probeX, o.dir);
+    const l = UT.locate(spUser, o.angleUser, o.spec.T, o.userIndexX, o.dir);
     const cx = X(l.x), cz = Z(l.depth);
     ctx.save();
     ctx.strokeStyle = color;
-    ctx.fillStyle = color;
     ctx.lineWidth = 2;
     if (kind === 'diamond') {
       ctx.beginPath();
@@ -344,13 +424,13 @@
     ctx.restore();
   }
 
+  // ------------------------------------------------------------------ probe
   function drawProbe(ctx, o, X, Z) {
     const wd = UT.CONFIG.wedge;
-    const xp = o.state.probeX, d = o.dir;
-    const xb = xp - d * wd.back, xf = xp + d * wd.front;
+    const d = o.dir;
+    const { xf, xb } = UT.probeExtent(o.state.probeX, d, o.H);
     const hf = wd.height * 0.55, hb = wd.height;
     ctx.save();
-    // Badan wedge
     ctx.beginPath();
     ctx.moveTo(X(xb), Z(0));
     ctx.lineTo(X(xf), Z(0));
@@ -362,9 +442,9 @@
     ctx.strokeStyle = COL.probe;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    // Housing kristal (di bagian belakang atas, miring)
-    const cx0 = xp - d * wd.back * 0.85, cx1 = xp - d * wd.back * 0.05;
+
     const zAt = (x) => -hb + ((-hf + hb) * (x - xb)) / (xf - xb);
+    const cx0 = xb + d * UT.PROBE_BODY * 0.08, cx1 = xb + d * UT.PROBE_BODY * 0.62;
     ctx.beginPath();
     ctx.moveTo(X(cx0), Z(zAt(cx0)));
     ctx.lineTo(X(cx1), Z(zAt(cx1)));
@@ -373,7 +453,6 @@
     ctx.closePath();
     ctx.fillStyle = COL.probe;
     ctx.fill();
-    // Kabel
     ctx.strokeStyle = '#444';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -381,15 +460,26 @@
     ctx.moveTo(X(kx), Z(zAt(kx) - 5));
     ctx.quadraticCurveTo(X(kx - d * 2), Z(zAt(kx) - 9), X(kx - d * 12), Z(zAt(kx) - 8));
     ctx.stroke();
-    // Exit point
-    ctx.fillStyle = '#e63946';
+
+    // Tanda index (menurut X-value yang dimasukkan teknisi)
+    const ix = X(o.userIndexX);
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(X(xp), Z(0));
-    ctx.lineTo(X(xp) - 5, Z(0) - 8);
-    ctx.lineTo(X(xp) + 5, Z(0) - 8);
-    ctx.closePath();
-    ctx.fill();
-    // Label
+    ctx.moveTo(ix, Z(0) - 1);
+    ctx.lineTo(ix, Z(-hf * 0.7));
+    ctx.stroke();
+    // Exit point sebenarnya (hanya mode guru)
+    if (o.showTruth) {
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.moveTo(X(o.state.probeX), Z(0));
+      ctx.lineTo(X(o.state.probeX) - 5, Z(0) - 8);
+      ctx.lineTo(X(o.state.probeX) + 5, Z(0) - 8);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     ctx.fillStyle = COL.text;
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -397,7 +487,7 @@
     ctx.fillText(`${o.state.angle}° · ${o.state.freq} MHz`, X((xb + xf) / 2), ly - 14);
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = COL.muted;
-    ctx.fillText(`index: ${xp.toFixed(1)} mm`, X((xb + xf) / 2), ly);
+    ctx.fillText(`index: ${o.userIndexX.toFixed(1)} mm`, X((xb + xf) / 2), ly);
     ctx.restore();
   }
 })(typeof window !== 'undefined' ? window : globalThis);

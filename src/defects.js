@@ -42,7 +42,7 @@
         const x = a[0] + dx * t, z = a[1] + dz * t;
         let mx = nx, mz = nz;
         if (closed && (x - cx) * mx + (z - cz) * mz < 0) { mx = -mx; mz = -mz; }
-        out.push({ x, z, nx: mx, nz: mz, w: refl * step, two });
+        out.push({ x, z, nx: mx, nz: mz, w: refl * step, two, y1: opt.y1, y2: opt.y2, rep: opt.rep });
       }
     }
   }
@@ -55,36 +55,43 @@
     for (let k = 0; k < n; k++) {
       const a = (2 * Math.PI * k) / n;
       const nx = Math.cos(a), nz = Math.sin(a);
-      out.push({ x: cx + r * nx, z: cz + r * nz, nx, nz, w: refl * step, two: false });
+      out.push({ x: cx + r * nx, z: cz + r * nz, nx, nz, w: refl * step, two: false, y1: opt && opt.y1, y2: opt && opt.y2 });
     }
   }
 
+  UT.samplePolyline = samplePolyline;
+  UT.sampleCircle = sampleCircle;
+
   // ---------------------------------------------------------------------------
   // Skenario cacat. Setiap build(w) mengembalikan:
-  //   { polys:[{pts, closed, refl, two, normal}], circles:[{x,z,r,refl}],
-  //     corners:[{x,z,s,face}], gap: [pts] (rongga untuk digambar), noRootBead }
+  //   { polys:[{pts, closed, refl, two, normal, y1, y2}], circles:[{x,z,r,refl,y}],
+  //     corners:[{x,z,s,face,y1,y2}], gap: [pts] (rongga untuk digambar), noRootBead }
+  // y = posisi searah sumbu las (mm, 0 … panjang las). Pori dianggap bola (y ± r).
   // Posisi cacat dihitung relatif terhadap geometri las sehingga ikut berubah
   // ketika tebal pelat / bevel diubah.
   // ---------------------------------------------------------------------------
 
-  function lofOnSide(w, side, z1, z2) {
-    return { pts: [[UT.fusionX(w, z1, side), z1], [UT.fusionX(w, z2, side), z2]], two: true, refl: 1 };
+  function lofOnSide(w, side, z1, z2, y1, y2) {
+    return { pts: [[UT.fusionX(w, z1, side), z1], [UT.fusionX(w, z2, side), z2]], two: true, refl: 1, y1, y2 };
   }
 
-  function porosityCluster(cx, cz, scale) {
+  function porosityCluster(cx, cz, scale, yc) {
     const base = [
-      [0, 0, 0.6], [1.8, 0.8, 0.4], [-1.5, 1.1, 0.5], [0.8, -1.3, 0.35],
-      [-0.6, 2.0, 0.45], [2.3, -0.6, 0.3], [-2.2, -0.5, 0.3],
+      [0, 0, 0.6, 0], [1.8, 0.8, 0.4, 2.5], [-1.5, 1.1, 0.5, -3], [0.8, -1.3, 0.35, 4.5],
+      [-0.6, 2.0, 0.45, -5.5], [2.3, -0.6, 0.3, -1.5], [-2.2, -0.5, 0.3, 6],
     ];
-    return base.map(([dx, dz, r]) => ({ x: cx + dx * scale, z: cz + dz * scale, r: r, refl: 1 }));
+    return base.map(([dx, dz, r, dy]) => {
+      const y = yc + dy * scale;
+      return { x: cx + dx * scale, z: cz + dz * scale, r, refl: 8, y, y1: y - r, y2: y + r };
+    });
   }
 
-  function slagPoly(cx, cz) {
+  function slagPoly(cx, cz, y1, y2) {
     const base = [
       [-2.8, 0.1], [-2.0, -0.6], [-0.9, -0.8], [0.0, -1.0], [1.2, -0.7], [2.0, -0.8],
       [2.9, 0.0], [2.1, 0.6], [1.0, 0.9], [0.1, 0.7], [-1.1, 0.9], [-2.1, 0.7],
     ];
-    return { pts: base.map(([dx, dz]) => [cx + dx, cz + dz]), closed: true, refl: 1.5 };
+    return { pts: base.map(([dx, dz]) => [cx + dx, cz + dz]), closed: true, refl: 1.5, y1, y2 };
   }
 
   UT.SCENARIOS = [
@@ -98,13 +105,13 @@
       id: 'lof-kiri',
       name: 'Lack of sidewall fusion – sisi kiri',
       desc: 'Tidak menyatu pada dinding bevel kiri. Paling jelas bila berkas tegak lurus bevel: dari probe di kiri lewat leg 2, atau dari probe di kanan lewat leg 1 (jika terjangkau).',
-      build: (w) => ({ polys: [lofOnSide(w, -1, w.T * 0.28, w.T * 0.62)] }),
+      build: (w) => ({ polys: [lofOnSide(w, -1, w.T * 0.28, w.T * 0.62, 130, 168)] }),
     },
     {
       id: 'lof-kanan',
       name: 'Lack of sidewall fusion – sisi kanan',
       desc: 'Tidak menyatu pada dinding bevel kanan. Coba scan dari kedua sisi las dan bandingkan amplitudonya.',
-      build: (w) => ({ polys: [lofOnSide(w, +1, w.T * 0.28, w.T * 0.62)] }),
+      build: (w) => ({ polys: [lofOnSide(w, +1, w.T * 0.28, w.T * 0.62, 125, 160)] }),
     },
     {
       id: 'ip',
@@ -116,12 +123,12 @@
         return {
           polys: [
             // Facet root face kecil (< lambda) hanya memberi sedikit difraksi; echo utama dari corner trap.
-            { pts: [[-w.g, w.T], [-w.g, z0]], two: false, normal: [-1, 0], refl: 0.2 },
-            { pts: [[w.g, w.T], [w.g, z0]], two: false, normal: [1, 0], refl: 0.2 },
+            { pts: [[-w.g, w.T], [-w.g, z0]], two: false, normal: [-1, 0], refl: 0.2, y1: 115, y2: 185 },
+            { pts: [[w.g, w.T], [w.g, z0]], two: false, normal: [1, 0], refl: 0.2, y1: 115, y2: 185 },
           ],
           corners: [
-            { x: -w.g, z: w.T, s: h, face: -1 },
-            { x: w.g, z: w.T, s: h, face: 1 },
+            { x: -w.g, z: w.T, s: h, face: -1, y1: 115, y2: 185 },
+            { x: w.g, z: w.T, s: h, face: 1, y1: 115, y2: 185 },
           ],
           gap: [[-w.g, w.T], [-w.g, z0], [w.g, z0], [w.g, w.T]],
           noRootBead: true,
@@ -132,13 +139,13 @@
       id: 'porositas',
       name: 'Porositas (kluster)',
       desc: 'Sekumpulan pori gas kecil. Echo lemah, lebar dan berpuncak banyak; amplitudo berubah cepat saat probe digeser.',
-      build: (w) => ({ circles: porosityCluster(-w.topHalf * 0.15, w.T * 0.45, Math.min(1, w.T / 20)) }),
+      build: (w) => ({ circles: porosityCluster(-w.topHalf * 0.15, w.T * 0.45, Math.min(1, w.T / 20), 150) }),
     },
     {
       id: 'slag',
       name: 'Slag inclusion',
       desc: 'Terak terperangkap di dalam las. Echo sedang dan bergerigi, bentuknya berubah saat probe digeser atau diputar.',
-      build: (w) => ({ polys: [slagPoly(w.topHalf * 0.25, w.T * 0.5)] }),
+      build: (w) => ({ polys: [slagPoly(w.topHalf * 0.25, w.T * 0.5, 144, 158)] }),
     },
     {
       id: 'crack',
@@ -151,7 +158,7 @@
           const t = i / n;
           pts.push([(i % 2 ? 0.35 : -0.3) + 0.6 * t, z1 + (z2 - z1) * t]);
         }
-        return { polys: [{ pts, two: true, refl: 1 }] };
+        return { polys: [{ pts, two: true, refl: 1, y1: 135, y2: 170 }] };
       },
     },
     {
@@ -162,8 +169,8 @@
         const h = Math.min(4, w.T * 0.25);
         const pts = [[0.4, w.T], [0.1, w.T - h * 0.35], [0.5, w.T - h * 0.7], [0.2, w.T - h]];
         return {
-          polys: [{ pts, two: true, refl: 1 }],
-          corners: [{ x: 0.4, z: w.T, s: h, face: 0 }],
+          polys: [{ pts, two: true, refl: 1, y1: 140, y2: 162 }],
+          corners: [{ x: 0.4, z: w.T, s: h, face: 0, y1: 140, y2: 162 }],
         };
       },
     },
@@ -172,8 +179,8 @@
       name: 'Campuran (LOF kanan + porositas + slag)',
       desc: 'Beberapa cacat sekaligus. Latih membedakan jenis cacat dari posisi, bentuk echo, dan perilakunya saat probe digeser dari kedua sisi.',
       build: (w) => ({
-        polys: [lofOnSide(w, +1, w.T * 0.2, w.T * 0.42), slagPoly(-w.topHalf * 0.2, w.T * 0.62)],
-        circles: porosityCluster(w.topHalf * 0.1, w.T * 0.8, 0.7),
+        polys: [lofOnSide(w, +1, w.T * 0.2, w.T * 0.42, 95, 122), slagPoly(-w.topHalf * 0.2, w.T * 0.62, 160, 171)],
+        circles: porosityCluster(w.topHalf * 0.1, w.T * 0.8, 0.7, 215),
       }),
     },
   ];
@@ -232,16 +239,16 @@
     };
   };
 
-  /** Hamburan butir material (grain noise): titik-titik acak tetap di dalam pelat. */
-  UT.buildGrain = function (w, seed) {
+  /** Hamburan butir material (grain noise): titik-titik acak tetap di dalam benda uji. */
+  UT.buildGrain = function (b, seed) {
     const rnd = UT.rng(seed || 12345);
     const C = UT.CONFIG;
-    const area = 2 * w.P * w.T;
-    const n = Math.round(area * C.GRAIN_DENSITY);
+    const width = b.xMax - b.xMin;
+    const n = Math.round(width * b.T * C.GRAIN_DENSITY);
     const xs = new Float32Array(n), zs = new Float32Array(n), ws = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      xs[i] = -w.P + rnd() * 2 * w.P;
-      zs[i] = 0.2 + rnd() * (w.T - 0.4);
+      xs[i] = b.xMin + rnd() * width;
+      zs[i] = 0.2 + rnd() * (b.T - 0.4);
       ws[i] = (rnd() * 2 - 1) * C.GRAIN_STRENGTH;
     }
     return { n, xs, zs, ws };

@@ -11,38 +11,61 @@
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.1 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.2 · acuan ASME Sec. V Art. 4</span>
     </div>
     <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
   </header>
 
   <section id="help" class="help" hidden>
-    <ol>
-      <li><b>Geser probe</b> pada tampilan scanning dengan mouse/jari, atau klik penampang lalu tekan tombol <kbd>←</kbd> <kbd>→</kbd> (tahan <kbd>Shift</kbd> untuk langkah 5 mm).</li>
-      <li>Perhatikan <b>A-scan</b> di sebelah kanan: echo muncul ketika berkas (biru) mengenai reflektor. Cari posisi probe yang memberi <b>amplitudo maksimum</b>.</li>
-      <li>Atur <b>Gate A</b> agar melingkupi echo. Jika echo melewati level gate, alat menampilkan <b>SP, kedalaman, jarak permukaan</b>, dan posisinya terhadap sumbu las (penanda oranye di penampang).</li>
-      <li>Arahkan kursor ke A-scan untuk melihat titik yang sesuai di sepanjang berkas (penanda hijau).</li>
-      <li>Pilih <b>skenario cacat</b>, lalu matikan “Tampilkan cacat” untuk berlatih menemukan cacat tanpa melihatnya.</li>
-      <li>Ubah <b>velocity</b> alat dari 3240 m/s untuk melihat akibat kalibrasi yang salah: posisi yang dihitung alat bergeser dari posisi cacat sebenarnya.</li>
-    </ol>
+    <div class="help-cols">
+      <div>
+        <h3>Dasar</h3>
+        <ol>
+          <li><b>Geser probe</b> dengan mouse/jari pada penampang atau tampak atas, atau klik penampang lalu tekan <kbd>←</kbd> <kbd>→</kbd> (melintang las) dan <kbd>↑</kbd> <kbd>↓</kbd> (sepanjang las). Tahan <kbd>Shift</kbd> untuk langkah 5 mm.</li>
+          <li>Cari posisi probe yang memberi <b>amplitudo maksimum</b>, lalu atur <b>Gate A</b> agar melingkupi echo.</li>
+          <li>Arahkan kursor ke A-scan untuk melihat titik yang sesuai di sepanjang berkas.</li>
+          <li>Matikan “Tampilkan cacat” untuk berlatih tanpa melihat cacat.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Alur kalibrasi (tombol “Probe baru”)</h3>
+        <ol>
+          <li><b>Blok IIW – probe index:</b> arahkan probe ke R100, cari echo maksimum, baca jarak depan probe ke pusat R100 → isi <b>X-value</b>.</li>
+          <li><b>Blok IIW – range/zero:</b> atur <b>zero</b> (dan velocity) sampai echo R100 tepat di 100 mm dan echo kedua di 200 mm.</li>
+          <li><b>Blok IIW – sudut:</b> balik probe ke arah lubang Ø50, cari echo maksimum, baca skala sudut pada tanda index → isi <b>sudut terukur</b>.</li>
+          <li><b>Blok ASME – DAC:</b> maksimalkan echo SDH ¼T, ½T, ¾T lalu lanjutkan lewat leg 2 (¾T → 5/4T, ½T → 6/4T, ¼T → 7/4T) agar DAC mencakup satu skip penuh. Rekam setiap titik tanpa mengubah gain. Lalu “Gain = reference” dan “Gain scanning +6 dB”.</li>
+          <li><b>Las:</b> scan, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, lihat hasil evaluasi ASME.</li>
+        </ol>
+      </div>
+    </div>
   </section>
+
+  <nav class="modebar" aria-label="Benda uji">
+    <span class="modebar-label">Benda uji:</span>
+    <div class="tabs" role="tablist" id="specTabs"></div>
+    <span id="calBadge" class="badge"></span>
+  </nav>
 
   <main class="views">
     <section class="panel">
       <div class="panel-head">
-        <h2>Tampilan scanning (penampang las)</h2>
+        <h2 id="sectionTitle">Tampilan scanning (penampang las)</h2>
         <span id="skipInfo" class="muted small"></span>
       </div>
-      <div class="canvas-wrap"><canvas id="cvSection" tabindex="0" aria-label="Penampang las dan probe. Seret untuk menggeser probe."></canvas></div>
+      <div class="canvas-wrap"><canvas id="cvSection" tabindex="0" aria-label="Penampang benda uji dan probe. Seret untuk menggeser probe."></canvas></div>
+      <div id="topWrap">
+        <div class="subhead small"><b>Tampak atas</b> <span class="muted">– seret untuk menggeser probe sepanjang las (skala y dipadatkan)</span></div>
+        <div class="canvas-wrap"><canvas id="cvTop" tabindex="0" aria-label="Tampak atas las. Seret untuk menggeser probe sepanjang las."></canvas></div>
+      </div>
       <ul class="legend small">
-        <li><i class="sw sw-exit"></i>Exit point (probe index)</li>
-        <li><i class="sw sw-beam"></i>Berkas −6 dB &amp; sumbu berkas</li>
-        <li><i class="sw sw-gate"></i>Rentang Gate A pada berkas</li>
+        <li><i class="sw sw-index"></i>Tanda index (X-value)</li>
+        <li><i class="sw sw-exit"></i>Exit point sebenarnya (mode guru)</li>
+        <li><i class="sw sw-beam"></i>Berkas −6 dB</li>
+        <li><i class="sw sw-gate"></i>Gate A (menurut alat)</li>
         <li><i class="sw sw-peak"></i>Posisi echo menurut alat</li>
-        <li><i class="sw sw-cursor"></i>Titik kursor A-scan</li>
+        <li><i class="sw sw-cursor"></i>Kursor A-scan</li>
         <li><i class="sw sw-defect"></i>Cacat (mode guru)</li>
       </ul>
-      <p class="muted small hint">Seret probe dengan mouse/jari, atau klik penampang lalu tekan <kbd>←</kbd> <kbd>→</kbd> (<kbd>Shift</kbd> = 5 mm).</p>
     </section>
 
     <section class="panel">
@@ -53,12 +76,15 @@
       <div class="canvas-wrap dark"><canvas id="cvAscan" aria-label="Layar A-scan"></canvas></div>
       <div class="readouts" aria-live="polite">
         <div><span>Amplitudo</span><b id="roAmp">–</b></div>
+        <div><span>Terhadap DAC</span><b id="roDac">–</b></div>
         <div><span>Sound path (SP)</span><b id="roSP">–</b></div>
         <div><span>Kedalaman</span><b id="roDepth">–</b></div>
         <div><span>Jarak permukaan</span><b id="roSD">–</b></div>
-        <div><span>Posisi thd sumbu las</span><b id="roX">–</b></div>
+        <div><span id="roXLabel">Posisi thd sumbu las</span><b id="roX">–</b></div>
         <div><span>Leg</span><b id="roLeg">–</b></div>
+        <div><span id="roPLabel">Posisi probe (y)</span><b id="roP">–</b></div>
       </div>
+      <div id="evalBox" class="evalbox" hidden></div>
     </section>
   </main>
 
@@ -68,20 +94,22 @@
       <label>Tebal pelat T (mm)
         <select id="inT"></select>
       </label>
-      <label>Sudut bevel (½ sudut)
-        <select id="inBevel"></select>
-      </label>
-      <label>Root gap (mm)
-        <input id="inGap" type="number" min="0" max="5" step="0.5">
-      </label>
-      <label class="check"><input id="inCap" type="checkbox"> Cap (reinforcement) ada</label>
-      <label class="check"><input id="inRoot" type="checkbox"> Root bead (penetrasi) ada</label>
-      <p class="muted small">Material: baja karbon, v<sub>T</sub> = 3240 m/s</p>
+      <div id="weldOnly">
+        <label>Sudut bevel (½ sudut)
+          <select id="inBevel"></select>
+        </label>
+        <label>Root gap (mm)
+          <input id="inGap" type="number" min="0" max="5" step="0.5">
+        </label>
+        <label class="check"><input id="inCap" type="checkbox"> Cap (reinforcement) ada</label>
+        <label class="check"><input id="inRoot" type="checkbox"> Root bead (penetrasi) ada</label>
+      </div>
+      <p id="specInfo" class="muted small"></p>
     </fieldset>
 
     <fieldset class="card">
       <legend>Probe</legend>
-      <label>Sudut probe
+      <label>Sudut nominal
         <select id="inAngle"></select>
       </label>
       <label>Frekuensi
@@ -90,10 +118,10 @@
       <label>Ukuran kristal
         <select id="inCrystal"></select>
       </label>
-      <div class="seg" role="group" aria-label="Sisi probe">
-        <span>Sisi probe</span>
-        <button type="button" id="sideL" class="btn seg-btn">Kiri</button>
-        <button type="button" id="sideR" class="btn seg-btn">Kanan</button>
+      <div class="seg" role="group" aria-label="Arah probe">
+        <span>Arah berkas</span>
+        <button type="button" id="sideL" class="btn seg-btn">→ kanan</button>
+        <button type="button" id="sideR" class="btn seg-btn">← kiri</button>
       </div>
       <p id="probeInfo" class="muted small"></p>
     </fieldset>
@@ -109,14 +137,12 @@
         <button type="button" class="btn" data-gain="6">+6</button>
       </div>
       <input id="inGain" type="range" min="0" max="90" step="0.5" aria-label="Gain (dB)">
+      <button type="button" id="btnPeak80" class="btn full">Atur gain: puncak gate = 80%</button>
       <label>Range (mm SP)
         <input id="inRange" type="number" min="10" max="400" step="5">
       </label>
-      <label>Delay (mm SP)
-        <input id="inDelay" type="number" min="0" max="300" step="1">
-      </label>
-      <label>Velocity (m/s)
-        <input id="inVel" type="number" min="2000" max="7000" step="10">
+      <label>Delay tampilan (mm SP)
+        <input id="inDelay" type="number" min="-30" max="300" step="1">
       </label>
       <label>Tampilan sinyal
         <select id="inRect">
@@ -140,13 +166,82 @@
       <p class="muted small">Pembacaan muncul bila echo di dalam gate melewati level gate.</p>
     </fieldset>
 
+    <fieldset class="card">
+      <legend>Kalibrasi probe &amp; alat</legend>
+      <label>X-value: depan probe → index (mm)
+        <input id="inXv" type="number" min="0" max="25" step="0.1">
+      </label>
+      <label>Sudut terukur (°)
+        <input id="inAngU" type="number" min="30" max="80" step="0.1">
+      </label>
+      <label>Zero / probe delay (µs)
+        <input id="inZero" type="number" min="0" max="30" step="0.01">
+      </label>
+      <label>Velocity (m/s)
+        <input id="inVel" type="number" min="2000" max="7000" step="10">
+      </label>
+      <div class="btnrow">
+        <button type="button" id="btnNewProbe" class="btn">Probe baru (belum dikalibrasi)</button>
+        <button type="button" id="btnAutoCal" class="btn">Isi nilai sebenarnya</button>
+      </div>
+      <ul id="calStatus" class="calstatus small"></ul>
+      <div id="blockHelp" class="blockhelp small"></div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>DAC (ASME)</legend>
+      <p id="dacInfo" class="small"></p>
+      <div class="btnrow">
+        <button type="button" id="btnDacAdd" class="btn">Rekam titik (puncak gate)</button>
+        <button type="button" id="btnDacUndo" class="btn">Hapus terakhir</button>
+        <button type="button" id="btnDacClear" class="btn">Hapus semua</button>
+      </div>
+      <div class="btnrow">
+        <button type="button" id="btnGainRef" class="btn">Gain = reference</button>
+        <button type="button" id="btnGainScan" class="btn">Gain scanning (+6 dB)</button>
+      </div>
+      <label class="check"><input id="inShowDac" type="checkbox"> Tampilkan kurva DAC di A-scan</label>
+      <ol id="dacList" class="daclist small"></ol>
+      <p id="dacMsg" class="warn small" hidden></p>
+    </fieldset>
+
+    <fieldset class="card wide" id="sizingCard">
+      <legend>Sizing &amp; evaluasi (ASME Sec. VIII Div. 1 App. 12)</legend>
+      <div class="sizing">
+        <div>
+          <b class="small">Panjang – 6 dB drop</b>
+          <p class="muted small">Maksimalkan echo, tekan “puncak gate = 80%”, geser probe sepanjang las sampai echo turun ke 40%, lalu tandai. Ulangi ke arah sebaliknya.</p>
+          <div class="btnrow">
+            <button type="button" id="btnY1" class="btn">Tandai ujung 1</button>
+            <button type="button" id="btnY2" class="btn">Tandai ujung 2</button>
+          </div>
+          <p class="small">Panjang: <b id="outLen">–</b></p>
+        </div>
+        <div>
+          <b class="small">Tinggi – 6 dB drop</b>
+          <p class="muted small">Geser probe maju/mundur dari posisi maksimum sampai echo turun 6 dB, tandai kedalaman tepi atas dan bawah.</p>
+          <div class="btnrow">
+            <button type="button" id="btnD1" class="btn">Tandai tepi atas</button>
+            <button type="button" id="btnD2" class="btn">Tandai tepi bawah</button>
+          </div>
+          <p class="small">Tinggi: <b id="outHeight">–</b></p>
+        </div>
+        <div>
+          <label>Interpretasi indikasi
+            <select id="inIndType"></select>
+          </label>
+          <button type="button" id="btnSizeReset" class="btn">Reset sizing</button>
+        </div>
+      </div>
+    </fieldset>
+
     <fieldset class="card wide">
       <legend>Cacat &amp; tampilan</legend>
-      <label>Skenario
+      <label id="scenarioLabel">Skenario cacat
         <select id="inScenario"></select>
       </label>
       <p id="scenarioDesc" class="desc"></p>
-      <label class="check"><input id="inShowDef" type="checkbox"> Tampilkan cacat (mode guru)</label>
+      <label class="check"><input id="inShowDef" type="checkbox"> Tampilkan cacat &amp; exit point sebenarnya (mode guru)</label>
       <label class="check"><input id="inShowBeam" type="checkbox"> Tampilkan berkas &amp; sinar</label>
       <label class="check"><input id="inGrain" type="checkbox"> Noise butir material</label>
     </fieldset>
@@ -155,21 +250,27 @@
       <legend>Catatan ASME</legend>
       <ul class="small notes">
         <li>Frekuensi nominal probe untuk pemeriksaan las umumnya 1–5 MHz (ASME Sec. V Art. 4).</li>
-        <li>Berkas sudut diarahkan kira-kira tegak lurus sumbu las, dari dua arah bila memungkinkan. Coba skenario LOF dari sisi kiri lalu kanan untuk melihat alasannya.</li>
-        <li>Pemindaian dilakukan pada gain minimal 2× (+6 dB) di atas <i>reference level</i> (DAC dari SDH pada blok kalibrasi dasar). <b>DAC &amp; kalibrasi hadir di v0.2.</b></li>
-        <li>ASME Sec. VIII Div. 1 App. 12: indikasi &gt; 20% reference level harus diselidiki (jenis, lokasi, panjang).</li>
+        <li>Blok kalibrasi dasar: SDH pada ¼T, ½T, ¾T. Diameter SDH mengikuti tebal (≤ 25 mm: 2,5 mm; 25–50 mm: 3 mm). Di simulator, tebal blok = tebal las.</li>
+        <li>Primary reference level: gain yang membuat titik DAC tertinggi berada di 80% FSH. Pemindaian dilakukan minimal 2× (+6 dB) di atas reference level.</li>
+        <li>Berkas sudut diarahkan kira-kira tegak lurus sumbu las, dari dua arah bila memungkinkan.</li>
+        <li>App. 12: indikasi &gt; 20% reference level diselidiki. Retak, lack of fusion, dan incomplete penetration tidak diterima berapa pun panjangnya. Indikasi lain ditolak bila melebihi reference level <i>dan</i> panjangnya &gt; 6 mm (t ≤ 19 mm), &gt; t/3 (19–57 mm), atau &gt; 19 mm (t &gt; 57 mm).</li>
+        <li>Koreksi transfer (perbedaan kekasaran permukaan/atenuasi blok vs benda uji) belum dimodelkan.</li>
       </ul>
-      <p class="muted small">Model fisika disederhanakan untuk keperluan edukasi dan tidak menggantikan latihan dengan alat serta spesimen nyata.</p>
+      <p class="muted small">Model fisika disederhanakan untuk keperluan edukasi dan tidak menggantikan latihan dengan alat serta spesimen nyata. Dimensi blok IIW disederhanakan.</p>
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.1 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.2 · ray tracing 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
   <script src="src/defects.js"></script>
   <script src="src/physics.js"></script>
+  <script src="src/specimens.js"></script>
+  <script src="src/calibration.js"></script>
+  <script src="src/dac.js"></script>
   <script src="src/render-section.js"></script>
+  <script src="src/render-topview.js"></script>
   <script src="src/render-ascan.js"></script>
   <script src="src/main.js"></script>
 </body>
