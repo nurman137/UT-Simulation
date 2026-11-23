@@ -18,6 +18,10 @@
   let dac = UT.dacCreate();
   let dacMsg = '';
   const sizing = { y1: null, y2: null, d1: null, d2: null };
+  // Kunci kontrol saat ujian: truth = mode guru, scenario = skenario & tebal, autoCal = isi nilai sebenarnya
+  const locks = { truth: false, scenario: false, autoCal: false };
+  const frameHooks = [];
+  let lastPct = null;
 
   let spec, view = null, sim = null, derived = null, simDirty = true;
   let hoverSP = null, lastPeak = null;
@@ -238,6 +242,14 @@
     sel('inIndType', 'indType', null, () => {});
 
     sel('inScenario', 'scenario', null, () => { resetSizing(); rebuild(false); });
+    num('inSeed', 'randSeed', () => { resetSizing(); rebuild(false); });
+    sel('inCount', 'randCount', parseFloat, () => { resetSizing(); rebuild(false); });
+    $('btnReroll').addEventListener('click', () => {
+      S.randSeed = UT.randomExamCode(rand);
+      resetSizing();
+      rebuild(false);
+      syncControls();
+    });
     chk('inShowDef', 'showDefects', () => {});
     chk('inShowBeam', 'showBeam', () => {});
     chk('inGrain', 'grain');
@@ -295,8 +307,13 @@
     $('weldOnly').hidden = !weld;
     $('topWrap').hidden = !weld;
     $('sizingCard').hidden = !weld;
-    $('inT').disabled = S.specimen === 'iiw';
-    $('inScenario').disabled = !weld;
+    $('inT').disabled = S.specimen === 'iiw' || locks.scenario;
+    $('inScenario').disabled = !weld || locks.scenario;
+    $('randRow').hidden = !weld || S.scenario !== 'acak' || locks.scenario;
+    $('inSeed').value = S.randSeed;
+    $('inCount').value = String(S.randCount);
+    $('inShowDef').disabled = locks.truth;
+    $('btnAutoCal').disabled = locks.autoCal;
     $('sectionTitle').textContent = weld ? 'Tampilan scanning (penampang las)'
       : `Tampilan scanning (${UT.SPECIMENS.find((s) => s.id === S.specimen).name})`;
     $('roXLabel').textContent = weld ? 'Posisi thd sumbu las' : 'Posisi x pada blok';
@@ -328,7 +345,8 @@
     $('inVel').value = S.velocity;
     $('inShowDac').checked = S.showDac;
     $('inScenario').value = S.scenario;
-    $('scenarioDesc').textContent = weld ? UT.findScenario(S.scenario).desc : 'Skenario cacat hanya berlaku pada benda uji las.';
+    $('scenarioDesc').textContent = !weld ? 'Skenario cacat hanya berlaku pada benda uji las.'
+      : locks.scenario ? 'Mode ujian: cacat dirahasiakan sampai jawaban dikirim.' : UT.findScenario(S.scenario).desc;
     $('inIndType').value = S.indType;
     $('inShowDef').checked = S.showDefects;
     $('inShowBeam').checked = S.showBeam;
@@ -589,6 +607,7 @@
 
     updateReadouts(peak, uIdx);
     renderBlockHelp();
+    for (let i = 0; i < frameHooks.length; i++) frameHooks[i](peak);
     requestAnimationFrame(frame);
   }
 
@@ -596,6 +615,7 @@
   function updateReadouts(peak, uIdx) {
     const ro = { amp: `${peak.amp.toFixed(0)}%`, dac: '–', sp: '–', depth: '–', sd: '–', x: '–', leg: '–' };
     let pct = null;
+    lastPct = null;
     if (peak.triggered) {
       const l = UT.locate(peak.sp, S.angleUser, spec.T, uIdx, dir());
       ro.amp = peak.amp >= 100 ? '>100%' : `${peak.amp.toFixed(0)}%`;
@@ -613,6 +633,7 @@
         const ref = UT.dacAt(dac, peak.sp, S.gain);
         if (ref != null) {
           pct = (peak.amp / ref) * 100;
+          lastPct = pct;
           const dB = 20 * Math.log10(pct / 100);
           ro.dac = `${pct.toFixed(0)}% (${dB >= 0 ? '+' : ''}${dB.toFixed(1)} dB)`;
         } else ro.dac = 'di luar DAC';
@@ -645,6 +666,33 @@
       box.innerHTML = `<b>Evaluasi ASME: ${label}</b> <span>${ev.text}</span>`;
     }
   }
+
+  // ---------------------------------------------------------------- API untuk modul edukasi (tutorial, ujian, laporan)
+  UT.app = {
+    S, sizing, locks, frameHooks,
+    get H() { return H; },
+    get spec() { return spec; },
+    get dac() { return dac; },
+    set dac(d) { dac = d; dacMsg = ''; renderDac(); },
+    get peak() { return lastPeak; },
+    get training() { return training; },
+    set training(v) { training = v; },
+    rand,
+    rebuild, setSpecimen, syncControls, newProbe, clearDac, resetSizing, setGain, renderSizing,
+    applyUserFromTruth, userIndexX, cal,
+    setSide,
+    dir,
+    calOk() {
+      return UT.calibrationStatus(H, { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity }, C.material.vT).ok;
+    },
+    /** Pembacaan alat untuk puncak gate saat ini, atau null. */
+    reading() {
+      if (!lastPeak || !lastPeak.triggered || !spec) return null;
+      const l = UT.locate(lastPeak.sp, S.angleUser, spec.T, userIndexX(), dir());
+      return { sp: lastPeak.sp, amp: lastPeak.amp, depth: l.depth, x: l.x, sd: l.sd, leg: l.leg, pct: lastPct };
+    },
+    forceSim() { simDirty = true; view = null; },
+  };
 
   // ---------------------------------------------------------------- start
   rebuild();

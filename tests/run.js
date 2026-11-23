@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
+['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
 const UT = globalThis.UT;
 const C = UT.CONFIG;
 
@@ -204,6 +204,75 @@ test('evaluasi ASME App. 12', () => {
   assert.strictEqual(ev({ pctDAC: null, type: 'slag' }), 'nodac');
   near(UT.asmeLengthLimit(30), 10, 1e-9);
   assert.strictEqual(UT.asmeLengthLimit(60), 19);
+});
+
+console.log('Ujian & laporan (v0.3)');
+const weldFor = (o) => UT.buildSpecimen(Object.assign({}, C.defaults, o));
+test('cacat acak: kode sama → soal sama, kode beda → soal beda', () => {
+  const a = weldFor({ scenario: 'acak', randSeed: 99, randCount: 3 }).scene.truth;
+  const b = weldFor({ scenario: 'acak', randSeed: 99, randCount: 3 }).scene.truth;
+  const c = weldFor({ scenario: 'acak', randSeed: 100, randCount: 3 }).scene.truth;
+  assert.deepStrictEqual(a, b);
+  assert.notDeepStrictEqual(a, c);
+  assert.strictEqual(a.length, 3);
+});
+test('cacat acak: di dalam pelat, tidak saling tumpang tindih sepanjang las', () => {
+  for (let seed = 1; seed <= 40; seed++) {
+    for (const T of [12, 20, 25]) {
+      const tr = weldFor({ T, scenario: 'acak', randSeed: seed, randCount: 3 }).scene.truth.slice().sort((p, q) => p.y1 - q.y1);
+      tr.forEach((d, i) => {
+        assert.ok(d.z1 >= 0 && d.z2 <= T + 1e-9, `kedalaman di luar pelat (seed ${seed}, T ${T})`);
+        assert.ok(d.y1 >= 0 && d.y2 <= C.weldLength && d.y2 > d.y1, `y tidak valid (seed ${seed})`);
+        if (i) assert.ok(d.y1 >= tr[i - 1].y2, `tumpang tindih (seed ${seed})`);
+      });
+    }
+  }
+});
+test('root bead tidak ada di daerah IP, ada di luar daerah IP', () => {
+  const sc = weldFor({ scenario: 'ip' }).scene;
+  const rootCorners = sc.corners.filter((c) => c.kind === 'geo' && c.z === sc.corners.find((k) => k.kind === 'cacat').z);
+  assert.ok(rootCorners.length >= 2);
+  rootCorners.forEach((c) => assert.ok(c.y2 <= 115 || c.y1 >= 185, 'root bead tumpang tindih dengan IP'));
+});
+test('penilaian: laporan sempurna = 100, kosong = 0', () => {
+  const tr = weldFor({ T: 20, scenario: 'acak', randSeed: 5, randCount: 3 }).scene.truth;
+  const perfect = tr.map((d) => ({ y1: d.y1, y2: d.y2, depth: (d.z1 + d.z2) / 2, x: (d.x1 + d.x2) / 2, pctDAC: 120, type: d.type, verdict: UT.expectedVerdict(d, 120, 20) }));
+  near(UT.gradeExam(tr, perfect, { t: 20 }).score, 100, 1e-9);
+  const empty = UT.gradeExam(tr, [], { t: 20 });
+  assert.strictEqual(empty.score, 0);
+  assert.ok(empty.perDefect.every((p) => p.notes[0].includes('terlewat')));
+});
+test('penilaian: indikasi palsu −10, jenis salah kehilangan poin jenis', () => {
+  const tr = [{ type: 'slag', y1: 100, y2: 110, z1: 9, z2: 11, x1: 0, x2: 4 }];
+  const good = { y1: 100, y2: 110, depth: 10, x: 2, pctDAC: 50, type: 'slag', verdict: 'terima' };
+  const fc = { y1: 200, y2: 210, depth: 5, x: 0, pctDAC: 40, type: 'porositas', verdict: 'terima' };
+  const r = UT.gradeExam(tr, [good, fc], { t: 20 });
+  near(r.score, 90, 1e-9);
+  assert.strictEqual(r.falseCalls.length, 1);
+  const wrongType = UT.gradeExam(tr, [Object.assign({}, good, { type: 'porositas' })], { t: 20 });
+  near(wrongType.score, 91, 1e-9); // kelas sama (non-planar) → 6 dari 15
+  const planarWrong = UT.gradeExam([Object.assign({}, tr[0], { type: 'lof' })], [Object.assign({}, good, { type: 'lof', verdict: 'terima' })], { t: 20 });
+  near(planarWrong.score, 85, 1e-9); // LOF harus ditolak
+});
+test('DAC otomatis: ≥ 6 titik (leg 1–3) menurun terhadap SP', () => {
+  const H = UT.makeProbeTruth(60, null);
+  const d = UT.autoDac({ T: 20, H, freq: 4, crystal: 10, cal: { vTrue: 3240, vUser: 3240, zeroTrue: H.zero, zeroUser: H.zero } });
+  assert.ok(d.points.length >= 6, `jumlah titik ${d.points.length}`);
+  for (let i = 1; i < d.points.length; i++) assert.ok(d.points[i].db < d.points[i - 1].db, 'DAC harus menurun');
+  near(d.points[0].sp, 5 / Math.cos(Math.PI / 3) - UT.asmeSdhDiameter(20) / 2, 0.6, 'SP titik ¼T = permukaan depan SDH');
+});
+test('laporan HTML: escape input pengguna dan memuat nilai', () => {
+  const tr = [{ type: 'slag', y1: 100, y2: 110, z1: 9, z2: 11, x1: 0, x2: 4 }];
+  const ind = [{ y1: 100, y2: 110, depth: 10, x: 2, pctDAC: 50, type: 'slag', verdict: 'terima', note: '<script>x</script>' }];
+  const html = UT.buildReportHTML({
+    student: 'Budi & <Ani>', date: 'd', mode: 'Ujian', code: 77, level: 'Mudah',
+    specimen: { T: 20, bevel: 30, material: 'Baja karbon' }, probe: { angle: 60, freq: 4, crystal: 10 },
+    cal: { xValue: 10, angleUser: 60, zero: 11, velocity: 3240 }, dac: { refGain: 50, scanGain: 56, points: [] },
+    indications: ind, result: UT.gradeExam(tr, ind, { t: 20 }),
+  });
+  assert.ok(html.includes('Budi &amp; &lt;Ani&gt;'));
+  assert.ok(!html.includes('<script>x</script>'));
+  assert.ok(html.includes('Nilai: <b>100</b>'));
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

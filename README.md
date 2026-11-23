@@ -11,6 +11,22 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 
 ## Fitur
 
+### v0.3 – Tutorial, ujian & laporan
+- **Pemilih aktivitas**: Bebas, Tutorial, dan Ujian.
+- **Tutorial terpandu** dengan 4 pelajaran. Setiap langkah dicek otomatis dari state simulator, ditambah kuis isian:
+  1. Dasar A-scan: menemukan echo, amplitudo maksimum, kedalaman, leg, scan dari dua sisi.
+  2. Kalibrasi probe di blok IIW: X-value, zero, echo kedua 200 mm, sudut dari Ø50.
+  3. Membuat DAC ASME: SDH ¼T, ½T, ¾T, 5/4T, reference level dan gain scanning.
+  4. Sizing 6 dB drop dan evaluasi ASME, lalu mencatat indikasi ke laporan.
+- **Mode ujian**: cacat acak tersembunyi yang bisa diulang dengan **kode soal** (satu kode untuk seluruh kelas), tiga tingkat kesulitan, timer, dan mode guru terkunci.
+  - Mudah: 1 cacat, probe ideal, DAC disediakan.
+  - Sedang: 2 cacat, buat DAC sendiri.
+  - Sulit: 3 cacat, probe harus dikalibrasi dulu di blok IIW.
+- **Penilaian otomatis** per cacat: deteksi 40, lokasi 15, panjang 15, jenis 15, keputusan 15. Setiap indikasi palsu −10 poin. Catatan kesalahan ditampilkan, lalu cacat dibuka setelah jawaban dikirim.
+- **Laporan indikasi** yang bisa diedit (isi otomatis dari pembacaan alat dan hasil sizing), **cetak / simpan PDF**, dan **unduh .html** berisi data probe, kalibrasi, titik DAC, indikasi, dan hasil penilaian.
+- **Skenario acak** juga tersedia di mode Bebas (kode soal + jumlah cacat).
+- Penampang menampilkan cacat pada posisi probe sepanjang las. Root bead hilang di daerah incomplete penetration.
+
 ### v0.2 – Kalibrasi, DAC & evaluasi ASME
 - **Tiga benda uji**: las, **blok IIW (V1)**, dan **blok kalibrasi dasar ASME** (SDH ¼T, ½T, ¾T dengan diameter sesuai tebal).
 - **Probe latihan** (tombol “Probe baru”): probe punya galat tersembunyi pada exit point, sudut, dan zero. Ketiganya harus ditemukan lewat kalibrasi:
@@ -71,11 +87,15 @@ src/physics.js          mesin simulasi sinyal A-scan
 src/specimens.js        benda uji: las, blok IIW (V1), blok kalibrasi dasar ASME
 src/calibration.js      kebenaran probe tersembunyi, pemetaan zero/velocity, X-value
 src/dac.js              DAC, reference level, evaluasi ASME App. 12
+src/exam.js             soal acak, DAC otomatis, penilaian ujian
+src/report.js           laporan inspeksi HTML (cetak/PDF/unduh)
+src/tutorial.js         definisi pelajaran tutorial
+src/edu.js              UI aktivitas: tutorial, ujian, tabel laporan
 src/render-section.js   gambar penampang, berkas, probe
 src/render-topview.js   tampak atas las (posisi probe sepanjang las, sizing)
 src/render-ascan.js     gambar layar A-scan
 src/main.js             state, kontrol UI, interaksi, loop render
-tests/run.js            unit test geometri & fisika
+tests/run.js            unit test geometri, fisika, kalibrasi, DAC, ujian, laporan
 docs/ROADMAP.md         rencana pengembangan
 ```
 
@@ -87,4 +107,4 @@ node tests/run.js
 
 ## Rencana berikutnya
 
-Lihat [docs/ROADMAP.md](docs/ROADMAP.md). Rencana terdekat (v0.3): mode tutorial dan mode ujian dengan cacat acak serta laporan inspeksi.
+Lihat [docs/ROADMAP.md](docs/ROADMAP.md). Rencana berikutnya (v0.4): B-scan/S-scan (Phased Array), TOFD, bevel X/U, dan geometri pipa.

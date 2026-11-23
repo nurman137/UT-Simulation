@@ -11,7 +11,7 @@
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.2 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.3 · acuan ASME Sec. V Art. 4</span>
     </div>
     <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
   </header>
@@ -36,9 +36,22 @@
           <li><b>Blok ASME – DAC:</b> maksimalkan echo SDH ¼T, ½T, ¾T lalu lanjutkan lewat leg 2 (¾T → 5/4T, ½T → 6/4T, ¼T → 7/4T) agar DAC mencakup satu skip penuh. Rekam setiap titik tanpa mengubah gain. Lalu “Gain = reference” dan “Gain scanning +6 dB”.</li>
           <li><b>Las:</b> scan, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, lihat hasil evaluasi ASME.</li>
         </ol>
+        <h3>Tutorial &amp; ujian</h3>
+        <p class="small">Pilih <b>Tutorial</b> untuk latihan terpandu, atau <b>Ujian</b> untuk soal acak dengan penilaian otomatis. Catat indikasi di kartu <b>Laporan indikasi</b>, lalu cetak atau unduh laporannya.</p>
       </div>
     </div>
   </section>
+
+  <nav class="modebar" aria-label="Aktivitas">
+    <span class="modebar-label">Aktivitas:</span>
+    <div class="tabs" role="tablist" id="actTabs">
+      <button type="button" class="tab" role="tab" data-act="bebas">Bebas</button>
+      <button type="button" class="tab" role="tab" data-act="tutorial">Tutorial</button>
+      <button type="button" class="tab" role="tab" data-act="ujian">Ujian</button>
+    </div>
+  </nav>
+
+  <section id="eduPanel" class="edupanel" hidden aria-live="polite"></section>
 
   <nav class="modebar" aria-label="Benda uji">
     <span class="modebar-label">Benda uji:</span>
@@ -235,11 +248,38 @@
       </div>
     </fieldset>
 
+    <fieldset class="card full" id="reportCard">
+      <legend>Laporan indikasi</legend>
+      <div class="reporthead">
+        <label>Nama pemeriksa <input id="inStudent" type="text" maxlength="60" placeholder="nama siswa"></label>
+        <div class="btnrow">
+          <button type="button" id="btnRepAdd" class="btn">+ Tambah dari pembacaan saat ini</button>
+          <button type="button" id="btnRepBlank" class="btn">+ Baris kosong</button>
+          <button type="button" id="btnRepPrint" class="btn">Cetak / simpan PDF</button>
+          <button type="button" id="btnRepDownload" class="btn">Unduh laporan (.html)</button>
+        </div>
+      </div>
+      <p class="muted small">“Tambah dari pembacaan” mengambil ujung-ujung hasil sizing (atau posisi probe), kedalaman, posisi, dan %DAC dari puncak gate, serta interpretasi yang dipilih. Semua kolom bisa diedit.</p>
+      <div class="tablewrap">
+        <table class="reptable">
+          <thead><tr><th>#</th><th>y awal</th><th>y akhir</th><th>Panjang</th><th>Kedalaman</th><th>Posisi x</th><th>%DAC</th><th>Interpretasi</th><th>Keputusan</th><th>Catatan</th><th></th></tr></thead>
+          <tbody id="repBody"></tbody>
+        </table>
+      </div>
+    </fieldset>
+
     <fieldset class="card wide">
       <legend>Cacat &amp; tampilan</legend>
       <label id="scenarioLabel">Skenario cacat
         <select id="inScenario"></select>
       </label>
+      <div id="randRow" class="randrow">
+        <label>Kode soal <input id="inSeed" type="number" min="1" max="99999" step="1"></label>
+        <label>Jumlah cacat
+          <select id="inCount"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        </label>
+        <button type="button" id="btnReroll" class="btn">Acak ulang</button>
+      </div>
       <p id="scenarioDesc" class="desc"></p>
       <label class="check"><input id="inShowDef" type="checkbox"> Tampilkan cacat &amp; exit point sebenarnya (mode guru)</label>
       <label class="check"><input id="inShowBeam" type="checkbox"> Tampilkan berkas &amp; sinar</label>
@@ -260,7 +300,7 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.2 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.3 · ray tracing 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
@@ -269,9 +309,13 @@
   <script src="src/specimens.js"></script>
   <script src="src/calibration.js"></script>
   <script src="src/dac.js"></script>
+  <script src="src/exam.js"></script>
+  <script src="src/report.js"></script>
   <script src="src/render-section.js"></script>
   <script src="src/render-topview.js"></script>
   <script src="src/render-ascan.js"></script>
   <script src="src/main.js"></script>
+  <script src="src/tutorial.js"></script>
+  <script src="src/edu.js"></script>
 </body>
 </html>

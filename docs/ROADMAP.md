@@ -24,10 +24,14 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [ ] Blok V2 (R25/R50) — ditunda; kalibrasi range sudah tercakup oleh R100 IIW
 - [ ] Koreksi transfer — ditunda
 
-## v0.3 – Mode edukasi
-- [ ] Mode tutorial langkah demi langkah
-- [ ] Mode ujian: cacat acak tersembunyi, laporan siswa, penilaian otomatis
-- [ ] Ekspor laporan inspeksi
+## v0.3 – Mode edukasi ✅
+- [x] Pemilih aktivitas Bebas / Tutorial / Ujian
+- [x] Tutorial langkah demi langkah (4 pelajaran) dengan cek otomatis dan kuis
+- [x] Generator cacat acak dengan kode soal (bisa diulang/dibagikan)
+- [x] Mode ujian: 3 tingkat, timer, mode guru terkunci, DAC otomatis untuk tingkat mudah
+- [x] Laporan indikasi yang bisa diedit + penilaian otomatis (deteksi, lokasi, panjang, jenis, keputusan, indikasi palsu)
+- [x] Ekspor laporan inspeksi (cetak/PDF, unduh .html)
+- [ ] Penyimpanan hasil ujian lintas siswa (rekap kelas) — perlu server/penyimpanan bersama
 
 ## v0.4+ – Lanjutan
 - [ ] B-scan dan S-scan (Phased Array)

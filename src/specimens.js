@@ -60,7 +60,7 @@
 
   function buildWeldSpecimen(S) {
     const weld = UT.buildWeld(S);
-    const scene = UT.buildScene(weld, S.scenario);
+    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount });
     const spec = {
       type: 'las', name: 'Las', T: weld.T, xMin: -weld.P, xMax: weld.P,
       yLen: UT.CONFIG.weldLength, weld, scene,
@@ -104,7 +104,7 @@
 
     const spec = {
       type: 'iiw', name: 'Blok IIW (V1)', T: B.T, xMin: 0, xMax: B.length, yLen: null,
-      scene: { points, corners, shapes: { polys: [], circles: [], gap: null }, rootBead: false },
+      scene: { points, corners, shapes: { polys: [], circles: [], gaps: [] }, ipRanges: [], truth: [], rootBead: false },
       outline,
       holes: [{ x: h.x, z: h.z, r: h.r, label: 'Ø50' }],
       marks: { r100Center: cx, angleScale: B.angleScale.map((a) => ({ a, x: h.x + h.z * Math.tan((a * Math.PI) / 180) })) },
@@ -127,7 +127,7 @@
     const outline = [[0, 0], [B.length, 0], [B.length, T], [0, T]];
     const spec = {
       type: 'asme', name: 'Blok kalibrasi dasar ASME', T, xMin: 0, xMax: B.length, yLen: null,
-      scene: { points, corners, shapes: { polys: [], circles: [], gap: null }, rootBead: false },
+      scene: { points, corners, shapes: { polys: [], circles: [], gaps: [] }, ipRanges: [], truth: [], rootBead: false },
       outline, holes, sdhDiameter: d, marks: {},
     };
     spec.grain = UT.buildGrain(spec, 4242);

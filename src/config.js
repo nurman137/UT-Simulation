@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.2.0',
+    version: '0.3.0',
 
     // Material benda uji (v0.1: baja karbon saja)
     material: {
@@ -38,7 +38,7 @@
     ELECTRONIC_NOISE: 0.004,
     // Kerapatan & kekuatan hamburan butir (grain noise)
     GRAIN_DENSITY: 0.6, // titik per mm^2
-    GRAIN_STRENGTH: 0.07,
+    GRAIN_STRENGTH: 0.03,
 
     defaults: {
       specimen: 'las',
@@ -67,6 +67,8 @@
       gateLevel: 20,
       // Cacat & tampilan
       scenario: 'lof-kiri',
+      randSeed: 1234,
+      randCount: 2,
       showDefects: true,
       showBeam: true,
       grain: true,

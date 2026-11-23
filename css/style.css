@@ -200,6 +200,64 @@ kbd {
 .sizing { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .sizing p { margin: 4px 0; }
 
+.edupanel {
+  margin: 10px 16px 0;
+  padding: 10px 14px;
+  background: #fffdf5;
+  border: 1px solid #ecd9a3;
+  border-radius: var(--radius);
+}
+.edu-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 6px; }
+.edu-head select, .examsetup input[type="number"], .examsetup input[type="text"] {
+  font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff;
+}
+.edu-head .btnrow { margin: 0 0 0 auto; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:disabled { background: #9db9d6; border-color: #9db9d6; }
+.lessonlist { margin: 4px 0; padding-left: 18px; }
+.tut { display: grid; grid-template-columns: minmax(160px, 220px) minmax(0, 1fr); gap: 14px; }
+.steps { margin: 0; padding-left: 20px; color: var(--muted); }
+.steps li { margin: 2px 0; }
+.steps li.done { color: #1d6b3a; }
+.steps li.done::marker { content: '✓  '; }
+.steps li.cur { color: var(--text); font-weight: 600; }
+.stepbox { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.steptitle { font-weight: 600; margin-bottom: 2px; }
+.stepbox p { margin: 4px 0 8px; }
+.stepfoot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.stepstatus { font-size: 13px; color: #8a6d00; }
+.stepstatus.ok { color: #1d6b3a; font-weight: 600; }
+.quiz { margin: 6px 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; }
+.quiz input { width: 90px; font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.ok { color: #1d6b3a; }
+.bad { color: #b0420a; }
+.examsetup { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; }
+.examsetup label { display: block; margin: 4px 0; }
+.examsetup input[type="text"] { display: block; width: 100%; max-width: 320px; }
+.lvl { flex-wrap: wrap; }
+.lvls { display: flex; flex-direction: column; gap: 4px; }
+.lvl { display: flex; align-items: baseline; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.examsteps { margin: 4px 0; padding-left: 20px; }
+.bigscore { font-size: 18px; margin: 4px 0 8px; }
+.bigscore b { font-size: 26px; }
+
+.randrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
+.randrow label { margin: 4px 0; }
+.randrow input[type="number"] { width: 100px; }
+
+.card.full { grid-column: 1 / -1; }
+.reporthead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 6px 12px; }
+.reporthead label input { display: block; font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; min-width: 220px; }
+.tablewrap { overflow-x: auto; }
+.reptable { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 4px; }
+.reptable th, .reptable td { border: 1px solid var(--line); padding: 3px 5px; text-align: left; vertical-align: middle; }
+.reptable th { background: #f1f4f7; font-weight: 600; white-space: nowrap; }
+.reptable td.c { text-align: center; }
+.reptable input[type="number"] { width: 72px; font: inherit; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; }
+.reptable input[type="text"] { width: 100%; min-width: 120px; font: inherit; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; }
+.reptable select { font: inherit; padding: 2px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.reptable .btn { padding: 0 6px; }
+
 .controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

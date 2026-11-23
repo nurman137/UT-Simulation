@@ -92,7 +92,7 @@
 
     drawScale(ctx, v, X, Z, o.spec);
 
-    if (o.state.showDefects && o.spec.type === 'las') drawDefects(ctx, o.spec.scene, X, Z);
+    if (o.state.showDefects && o.spec.type === 'las') drawDefects(ctx, o.spec.scene, X, Z, o.state.probeY);
 
     if (o.state.showBeam) drawBeam(ctx, o, X, Z, o.spMaxTrue);
     drawSkipMarks(ctx, o, X, Z);
@@ -113,8 +113,12 @@
   };
 
   // ------------------------------------------------------------------ benda uji
+  /** Apakah posisi y berada di dalam salah satu rentang. */
+  const inRanges = (y, rs) => (rs || []).some((r) => y >= r.y1 && y <= r.y2);
+
   function drawWeld(ctx, v, o, X, Z) {
     const spec = o.spec, w = spec.weld, scene = spec.scene, T = w.T;
+    const bead = scene.rootBead && !inRanges(o.state.probeY, scene.ipRanges);
     const px0 = Math.max(spec.xMin, v.x0 - 5), px1 = Math.min(spec.xMax, v.x1 + 5);
     ctx.fillStyle = COL.plate;
     ctx.fillRect(X(px0), Z(0), X(px1) - X(px0), Z(T) - Z(0));
@@ -141,7 +145,7 @@
     ctx.lineTo(X(w.topHalf), Z(0));
     ctx.lineTo(X(w.g), Z(T - w.rf));
     ctx.lineTo(X(w.g), Z(T));
-    if (scene.rootBead) {
+    if (bead) {
       ctx.lineTo(X(w.rootHalf), Z(T));
       ctx.quadraticCurveTo(X(0), Z(T + 2 * w.rootH), X(-w.rootHalf), Z(T));
     }
@@ -181,8 +185,8 @@
     ctx.beginPath();
     ctx.moveTo(X(px0), Z(0)); ctx.lineTo(X(-w.capHalf), Z(0));
     ctx.moveTo(X(w.capHalf), Z(0)); ctx.lineTo(X(px1), Z(0));
-    ctx.moveTo(X(px0), Z(T)); ctx.lineTo(X(scene.rootBead ? -w.rootHalf : -w.g), Z(T));
-    ctx.moveTo(X(scene.rootBead ? w.rootHalf : w.g), Z(T)); ctx.lineTo(X(px1), Z(T));
+    ctx.moveTo(X(px0), Z(T)); ctx.lineTo(X(bead ? -w.rootHalf : -w.g), Z(T));
+    ctx.moveTo(X(bead ? w.rootHalf : w.g), Z(T)); ctx.lineTo(X(px1), Z(T));
     if (px0 === spec.xMin) { ctx.moveTo(X(px0), Z(0)); ctx.lineTo(X(px0), Z(T)); }
     if (px1 === spec.xMax) { ctx.moveTo(X(px1), Z(0)); ctx.lineTo(X(px1), Z(T)); }
     ctx.stroke();
@@ -281,16 +285,21 @@
     }
   }
 
-  function drawDefects(ctx, scene, X, Z) {
+  // Cacat di bawah probe (±10 mm searah las) digambar tegas, yang lain samar.
+  function drawDefects(ctx, scene, X, Z, yProbe) {
     const sh = scene.shapes;
-    if (sh.gap) {
+    const alphaFor = (y1, y2) => (y1 == null || (y2 >= yProbe - 10 && y1 <= yProbe + 10) ? 1 : 0.22);
+    ctx.save();
+    (sh.gaps || []).forEach((gp) => {
+      ctx.globalAlpha = alphaFor(gp.y1, gp.y2);
       ctx.fillStyle = 'rgba(30,30,30,0.85)';
       ctx.beginPath();
-      sh.gap.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Z(p[1])) : ctx.moveTo(X(p[0]), Z(p[1]))));
+      gp.pts.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Z(p[1])) : ctx.moveTo(X(p[0]), Z(p[1]))));
       ctx.closePath();
       ctx.fill();
-    }
+    });
     sh.polys.forEach((p) => {
+      ctx.globalAlpha = alphaFor(p.y1, p.y2);
       ctx.beginPath();
       p.pts.forEach((q, i) => (i ? ctx.lineTo(X(q[0]), Z(q[1])) : ctx.moveTo(X(q[0]), Z(q[1]))));
       if (p.closed) {
@@ -308,6 +317,7 @@
       }
     });
     sh.circles.forEach((c) => {
+      ctx.globalAlpha = alphaFor(c.y1, c.y2);
       ctx.beginPath();
       ctx.arc(X(c.x), Z(c.z), Math.max(1.5, c.r * (X(1) - X(0))), 0, 2 * Math.PI);
       ctx.fillStyle = COL.defectFill;
@@ -316,6 +326,7 @@
       ctx.lineWidth = 1;
       ctx.stroke();
     });
+    ctx.restore();
   }
 
   // ------------------------------------------------------------------ berkas
