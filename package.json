@@ -1,0 +1,10 @@
+{
+  "name": "ut-simulation",
+  "version": "0.1.0",
+  "description": "Simulator Ultrasonic Testing (UT) probe sudut untuk inspeksi las – media edukasi NDT",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "license": "UNLICENSED"
+}

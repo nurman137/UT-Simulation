@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulator UT Las</title>
+  <meta name="description" content="Simulator Ultrasonic Testing (UT) probe sudut untuk inspeksi las – media edukasi NDT.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>Simulator UT Las</strong>
+      <span class="ver">v0.1 · acuan ASME Sec. V Art. 4</span>
+    </div>
+    <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
+  </header>
+
+  <section id="help" class="help" hidden>
+    <ol>
+      <li><b>Geser probe</b> pada tampilan scanning dengan mouse/jari, atau klik penampang lalu tekan tombol <kbd>←</kbd> <kbd>→</kbd> (tahan <kbd>Shift</kbd> untuk langkah 5 mm).</li>
+      <li>Perhatikan <b>A-scan</b> di sebelah kanan: echo muncul ketika berkas (biru) mengenai reflektor. Cari posisi probe yang memberi <b>amplitudo maksimum</b>.</li>
+      <li>Atur <b>Gate A</b> agar melingkupi echo. Jika echo melewati level gate, alat menampilkan <b>SP, kedalaman, jarak permukaan</b>, dan posisinya terhadap sumbu las (penanda oranye di penampang).</li>
+      <li>Arahkan kursor ke A-scan untuk melihat titik yang sesuai di sepanjang berkas (penanda hijau).</li>
+      <li>Pilih <b>skenario cacat</b>, lalu matikan “Tampilkan cacat” untuk berlatih menemukan cacat tanpa melihatnya.</li>
+      <li>Ubah <b>velocity</b> alat dari 3240 m/s untuk melihat akibat kalibrasi yang salah: posisi yang dihitung alat bergeser dari posisi cacat sebenarnya.</li>
+    </ol>
+  </section>
+
+  <main class="views">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Tampilan scanning (penampang las)</h2>
+        <span id="skipInfo" class="muted small"></span>
+      </div>
+      <div class="canvas-wrap"><canvas id="cvSection" tabindex="0" aria-label="Penampang las dan probe. Seret untuk menggeser probe."></canvas></div>
+      <ul class="legend small">
+        <li><i class="sw sw-exit"></i>Exit point (probe index)</li>
+        <li><i class="sw sw-beam"></i>Berkas −6 dB &amp; sumbu berkas</li>
+        <li><i class="sw sw-gate"></i>Rentang Gate A pada berkas</li>
+        <li><i class="sw sw-peak"></i>Posisi echo menurut alat</li>
+        <li><i class="sw sw-cursor"></i>Titik kursor A-scan</li>
+        <li><i class="sw sw-defect"></i>Cacat (mode guru)</li>
+      </ul>
+      <p class="muted small hint">Seret probe dengan mouse/jari, atau klik penampang lalu tekan <kbd>←</kbd> <kbd>→</kbd> (<kbd>Shift</kbd> = 5 mm).</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>A-scan</h2>
+        <span id="satWarn" class="warn small" hidden>Saturasi &gt;100% FSH – turunkan gain</span>
+      </div>
+      <div class="canvas-wrap dark"><canvas id="cvAscan" aria-label="Layar A-scan"></canvas></div>
+      <div class="readouts" aria-live="polite">
+        <div><span>Amplitudo</span><b id="roAmp">–</b></div>
+        <div><span>Sound path (SP)</span><b id="roSP">–</b></div>
+        <div><span>Kedalaman</span><b id="roDepth">–</b></div>
+        <div><span>Jarak permukaan</span><b id="roSD">–</b></div>
+        <div><span>Posisi thd sumbu las</span><b id="roX">–</b></div>
+        <div><span>Leg</span><b id="roLeg">–</b></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="controls">
+    <fieldset class="card">
+      <legend>Benda uji</legend>
+      <label>Tebal pelat T (mm)
+        <select id="inT"></select>
+      </label>
+      <label>Sudut bevel (½ sudut)
+        <select id="inBevel"></select>
+      </label>
+      <label>Root gap (mm)
+        <input id="inGap" type="number" min="0" max="5" step="0.5">
+      </label>
+      <label class="check"><input id="inCap" type="checkbox"> Cap (reinforcement) ada</label>
+      <label class="check"><input id="inRoot" type="checkbox"> Root bead (penetrasi) ada</label>
+      <p class="muted small">Material: baja karbon, v<sub>T</sub> = 3240 m/s</p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Probe</legend>
+      <label>Sudut probe
+        <select id="inAngle"></select>
+      </label>
+      <label>Frekuensi
+        <select id="inFreq"></select>
+      </label>
+      <label>Ukuran kristal
+        <select id="inCrystal"></select>
+      </label>
+      <div class="seg" role="group" aria-label="Sisi probe">
+        <span>Sisi probe</span>
+        <button type="button" id="sideL" class="btn seg-btn">Kiri</button>
+        <button type="button" id="sideR" class="btn seg-btn">Kanan</button>
+      </div>
+      <p id="probeInfo" class="muted small"></p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Flaw detector</legend>
+      <div class="gain">
+        <span>Gain</span>
+        <button type="button" class="btn" data-gain="-6">−6</button>
+        <button type="button" class="btn" data-gain="-0.5">−0.5</button>
+        <output id="gainOut">0 dB</output>
+        <button type="button" class="btn" data-gain="0.5">+0.5</button>
+        <button type="button" class="btn" data-gain="6">+6</button>
+      </div>
+      <input id="inGain" type="range" min="0" max="90" step="0.5" aria-label="Gain (dB)">
+      <label>Range (mm SP)
+        <input id="inRange" type="number" min="10" max="400" step="5">
+      </label>
+      <label>Delay (mm SP)
+        <input id="inDelay" type="number" min="0" max="300" step="1">
+      </label>
+      <label>Velocity (m/s)
+        <input id="inVel" type="number" min="2000" max="7000" step="10">
+      </label>
+      <label>Tampilan sinyal
+        <select id="inRect">
+          <option value="full">Full wave (rektifikasi)</option>
+          <option value="rf">RF</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Gate A</legend>
+      <label>Awal (mm SP)
+        <input id="inGs" type="number" min="0" max="400" step="1">
+      </label>
+      <label>Lebar (mm SP)
+        <input id="inGw" type="number" min="1" max="400" step="1">
+      </label>
+      <label>Level (% FSH)
+        <input id="inGl" type="number" min="5" max="95" step="1">
+      </label>
+      <p class="muted small">Pembacaan muncul bila echo di dalam gate melewati level gate.</p>
+    </fieldset>
+
+    <fieldset class="card wide">
+      <legend>Cacat &amp; tampilan</legend>
+      <label>Skenario
+        <select id="inScenario"></select>
+      </label>
+      <p id="scenarioDesc" class="desc"></p>
+      <label class="check"><input id="inShowDef" type="checkbox"> Tampilkan cacat (mode guru)</label>
+      <label class="check"><input id="inShowBeam" type="checkbox"> Tampilkan berkas &amp; sinar</label>
+      <label class="check"><input id="inGrain" type="checkbox"> Noise butir material</label>
+    </fieldset>
+
+    <fieldset class="card wide">
+      <legend>Catatan ASME</legend>
+      <ul class="small notes">
+        <li>Frekuensi nominal probe untuk pemeriksaan las umumnya 1–5 MHz (ASME Sec. V Art. 4).</li>
+        <li>Berkas sudut diarahkan kira-kira tegak lurus sumbu las, dari dua arah bila memungkinkan. Coba skenario LOF dari sisi kiri lalu kanan untuk melihat alasannya.</li>
+        <li>Pemindaian dilakukan pada gain minimal 2× (+6 dB) di atas <i>reference level</i> (DAC dari SDH pada blok kalibrasi dasar). <b>DAC &amp; kalibrasi hadir di v0.2.</b></li>
+        <li>ASME Sec. VIII Div. 1 App. 12: indikasi &gt; 20% reference level harus diselidiki (jenis, lokasi, panjang).</li>
+      </ul>
+      <p class="muted small">Model fisika disederhanakan untuk keperluan edukasi dan tidak menggantikan latihan dengan alat serta spesimen nyata.</p>
+    </fieldset>
+  </section>
+
+  <footer class="foot muted small">Simulator UT Las v0.1 · ray tracing 2D + model amplitudo semi-analitik</footer>
+
+  <script src="src/config.js"></script>
+  <script src="src/geometry.js"></script>
+  <script src="src/defects.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/render-section.js"></script>
+  <script src="src/render-ascan.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
