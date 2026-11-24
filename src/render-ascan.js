@@ -57,7 +57,7 @@
       ctx.fillText((o.delay + (i * o.range) / 10).toFixed(o.range < 50 ? 1 : 0), x, T + h + 14);
     }
     ctx.textAlign = 'right';
-    ctx.fillText('SP (mm)', L + w, T + h + 26);
+    ctx.fillText(o.xLabel || 'SP (mm)', L + w, T + h + 26);
     ctx.save();
     ctx.translate(11, T + h / 2);
     ctx.rotate(-Math.PI / 2);
@@ -177,7 +177,8 @@
       ctx.fillStyle = COL.cursor;
       ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
       ctx.textAlign = x > L + w - 80 ? 'right' : 'left';
-      ctx.fillText(`SP ${o.hoverSP.toFixed(1)}`, x + (ctx.textAlign === 'left' ? 4 : -4), T + 12);
+      const lab = o.xLabel && o.xLabel.startsWith('waktu') ? `${o.hoverSP.toFixed(2)} µs` : `SP ${o.hoverSP.toFixed(1)}`;
+      ctx.fillText(lab, x + (ctx.textAlign === 'left' ? 4 : -4), T + 12);
     }
 
     ctx.restore();

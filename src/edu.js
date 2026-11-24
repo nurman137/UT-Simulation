@@ -195,7 +195,9 @@
     const lvEl = panel.querySelector('input[name=lvl]:checked');
     examLevel = lvEl ? lvEl.value : examLevel;
     const ex = UT.makeExam(code, examLevel);
+    app.setTechnique('ut');
     Object.assign(S, {
+      bevelType: 'V',
       T: ex.T, bevelHalf: 30, rootGap: 2, cap: true, rootBead: true,
       scenario: 'acak', randSeed: code, randCount: ex.count, showDefects: false,
       probeY: 150, side: 'kiri', angle: 60, freq: 4, crystal: 10, velocity: C.material.vT, gateLevel: 20, probeX: null,

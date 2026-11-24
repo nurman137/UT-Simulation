@@ -10,6 +10,8 @@
 
   function baseSetup(app, o) {
     const S = app.S;
+    if (app.setTechnique) app.setTechnique('ut');
+    S.bevelType = 'V';
     app.locks.truth = app.locks.scenario = app.locks.autoCal = false;
     Object.assign(S, {
       T: 20, bevelHalf: 30, rootGap: 2, rootFace: 1.5, cap: true, rootBead: true,

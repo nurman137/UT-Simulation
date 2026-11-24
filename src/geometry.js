@@ -13,27 +13,83 @@
   const UT = (g.UT = g.UT || {});
   const DEG = Math.PI / 180;
 
-  /** Bangun model las bevel V tunggal dari parameter. */
+  UT.BEVEL_TYPES = [
+    { id: 'V', name: 'V tunggal' },
+    { id: 'X', name: 'X (V ganda)' },
+    { id: 'U', name: 'U' },
+  ];
+
+  /**
+   * Bangun model las dari parameter.
+   *  V : bevel tunggal, root face di dasar.
+   *  X : bevel ganda simetris, root face di tengah tebal, las dari dua sisi
+   *      (root bead = cap sisi kedua).
+   *  U : alur U, jari-jari akar R, dinding 10° dari vertikal.
+   */
   UT.buildWeld = function (p) {
     const T = p.T;
-    const beta = p.bevelHalf * DEG; // setengah sudut bevel (dari vertikal)
+    const type = p.bevelType || 'V';
     const g = p.rootGap / 2; // setengah root gap
-    const rf = Math.min(p.rootFace, T * 0.4); // root face (land)
-    const topHalf = g + (T - rf) * Math.tan(beta); // setengah lebar bukaan di permukaan
-    const capHalf = topHalf + 2; // cap melebar ~2 mm di tiap sisi
-    const rootHalf = g + 1.5;
-    const capH = p.cap ? Math.min(3, 1.2 + T * 0.05) : 0;
-    const rootH = p.rootBead ? 1.5 : 0;
-    return {
-      T, beta, g, rf, topHalf, capHalf, rootHalf, capH, rootH,
-      P: UT.CONFIG.plateHalfLength,
-    };
+    const w = { T, type, g, P: UT.CONFIG.plateHalfLength };
+    if (type === 'X') {
+      w.rf = Math.min(p.rootFace, T * 0.3);
+      w.beta = p.bevelHalf * DEG;
+      w.zL1 = T / 2 - w.rf / 2;
+      w.zL2 = T / 2 + w.rf / 2;
+    } else if (type === 'U') {
+      w.rf = Math.min(p.rootFace, T * 0.3);
+      w.beta = 10 * DEG;
+      w.R = Math.min(5, (T - w.rf) * 0.4);
+      w.z0 = T - w.rf;
+      w.zEnd = w.z0 - w.R + w.R * Math.sin(w.beta);
+      w.xEnd = g + w.R * Math.cos(w.beta);
+    } else {
+      w.rf = Math.min(p.rootFace, T * 0.4);
+      w.beta = p.bevelHalf * DEG;
+    }
+    w.topHalf = UT.fusionX(w, 0, 1); // setengah lebar bukaan di permukaan atas
+    w.botHalf = UT.fusionX(w, T, 1); // setengah lebar bukaan di permukaan bawah
+    w.capHalf = w.topHalf + 2; // cap melebar ~2 mm di tiap sisi
+    w.capH = p.cap ? Math.min(3, 1.2 + T * 0.05) : 0;
+    if (type === 'X') {
+      w.rootHalf = w.botHalf + 2;
+      w.rootH = p.rootBead ? w.capH || Math.min(3, 1.2 + T * 0.05) : 0;
+    } else {
+      w.rootHalf = w.botHalf + 1.5;
+      w.rootH = p.rootBead ? 1.5 : 0;
+    }
+    return w;
   };
 
   /** Posisi x garis fusi pada kedalaman z. side = -1 (kiri) atau +1 (kanan). */
   UT.fusionX = function (w, z, side) {
-    const x = z >= w.T - w.rf ? w.g : w.g + (w.T - w.rf - z) * Math.tan(w.beta);
+    let x;
+    if (w.type === 'X') {
+      if (z < w.zL1) x = w.g + (w.zL1 - z) * Math.tan(w.beta);
+      else if (z > w.zL2) x = w.g + (z - w.zL2) * Math.tan(w.beta);
+      else x = w.g;
+    } else if (w.type === 'U') {
+      if (z >= w.z0) x = w.g;
+      else if (z >= w.zEnd) {
+        const dz = z - (w.z0 - w.R);
+        x = w.g + Math.sqrt(Math.max(0, w.R * w.R - dz * dz));
+      } else x = w.xEnd + (w.zEnd - z) * Math.tan(w.beta);
+    } else {
+      x = z >= w.T - w.rf ? w.g : w.g + (w.T - w.rf - z) * Math.tan(w.beta);
+    }
     return side * x;
+  };
+
+  /** Profil garis fusi dari permukaan atas ke bawah sebagai [[x, z], ...], digeser 'off' mm ke luar. */
+  UT.fusionProfile = function (w, side, off) {
+    off = off || 0;
+    const zs = [0, w.T];
+    for (let i = 1; i < 48; i++) zs.push((w.T * i) / 48);
+    if (w.type === 'X') zs.push(w.zL1, w.zL2);
+    else if (w.type === 'U') zs.push(w.z0, w.zEnd);
+    else zs.push(w.T - w.rf);
+    zs.sort((a, b) => a - b);
+    return zs.map((z) => [UT.fusionX(w, z, side) + side * off, z]);
   };
 
   /**

@@ -101,9 +101,31 @@
       ctx.fillText(`ujung ${i + 1}`, v.cw - 6, Y(y) - 3);
     });
 
+    const yp = o.state.probeY, hw = UT.PROBE_WIDTH / 2;
+    if (o.tofdS != null) {
+      // TOFD: pemancar & penerima simetris terhadap sumbu las, dipindai sepanjang las
+      [[-o.tofdS, 1], [o.tofdS, -1]].forEach(([x0, d]) => {
+        const xf = x0 + d * 8, xb = x0 - d * 22;
+        ctx.fillStyle = 'rgba(80,120,170,0.55)';
+        ctx.strokeStyle = '#2b3440';
+        ctx.lineWidth = 1.5;
+        const rx = X(Math.min(xf, xb)), rw = Math.abs(X(xf) - X(xb));
+        ctx.fillRect(rx, Y(yp - hw * 0.6), rw, Y(yp + hw * 0.6) - Y(yp - hw * 0.6));
+        ctx.strokeRect(rx, Y(yp - hw * 0.6), rw, Y(yp + hw * 0.6) - Y(yp - hw * 0.6));
+      });
+      ctx.strokeStyle = '#0077cc';
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(X(-o.tofdS), Y(yp)); ctx.lineTo(X(o.tofdS), Y(yp)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#26303a';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`y = ${yp.toFixed(1)} mm`, X(0), Y(yp + hw) + 12 > lay.top + lay.h ? Y(yp - hw) - 4 : Y(yp + hw) + 12);
+      ctx.restore();
+      return;
+    }
     // Probe (tapak wedge) + arah berkas
     const { xf, xb } = UT.probeExtent(o.state.probeX, o.dir, o.H);
-    const yp = o.state.probeY, hw = UT.PROBE_WIDTH / 2;
     const rx = X(Math.min(xf, xb)), rw = Math.abs(X(xf) - X(xb));
     ctx.fillStyle = 'rgba(80,120,170,0.55)';
     ctx.strokeStyle = '#2b3440';

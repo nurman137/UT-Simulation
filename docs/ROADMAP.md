@@ -33,11 +33,18 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Ekspor laporan inspeksi (cetak/PDF, unduh .html)
 - [ ] Penyimpanan hasil ujian lintas siswa (rekap kelas) — perlu server/penyimpanan bersama
 
-## v0.4+ – Lanjutan
-- [ ] B-scan dan S-scan (Phased Array)
-- [ ] TOFD
-- [ ] Bevel X/U, geometri pipa (las girth)
-- [ ] Material austenitik (noise tinggi, pembelokan berkas)
+## v0.4 – Teknik lanjutan ✅
+- [x] B-scan UT konvensional (sepanjang las dan melintang)
+- [x] Phased Array S-scan 40–70° (16 elemen, 5 MHz) + A-scan per sudut
+- [x] TOFD: gelombang lateral, back wall, difraksi ujung dengan fase benar, D-scan, sizing tinggi
+- [x] Bevel X (V ganda) dan U
+- [ ] Fokus elektronik & delay law Phased Array, scan linear (E-scan) — ditunda
+
+## v0.5 – Rencana
+- [ ] Geometri pipa (las girth): permukaan lengkung, koreksi jarak permukaan
+- [ ] Material austenitik: noise butir tinggi, atenuasi besar, pembelokan berkas sederhana
+- [ ] Rekap nilai ujian satu kelas (perlu penyimpanan bersama)
+- [ ] Pilihan acuan lain (AWS D1.1 / ISO 11666) untuk evaluasi
 
 ## v1.0
 - [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III

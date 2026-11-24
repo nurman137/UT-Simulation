@@ -42,7 +42,7 @@
         const x = a[0] + dx * t, z = a[1] + dz * t;
         let mx = nx, mz = nz;
         if (closed && (x - cx) * mx + (z - cz) * mz < 0) { mx = -mx; mz = -mz; }
-        out.push({ x, z, nx: mx, nz: mz, w: refl * step, two, y1: opt.y1, y2: opt.y2, rep: opt.rep });
+        out.push({ x, z, nx: mx, nz: mz, w: refl * step, two, y1: opt.y1, y2: opt.y2, rep: opt.rep, tr: closed ? 0.35 : 1 });
       }
     }
   }
@@ -83,6 +83,19 @@
       };
     },
     ip(w, y1, y2, h) {
+      if (w.type === 'X') {
+        // Bevel X: root face berada di tengah tebal → IP tertanam (lack of root fusion), tanpa corner trap.
+        // Echo berasal dari difraksi ujung dan pantulan lemah dari muka root face.
+        const za = w.zL1 - 0.2, zb = w.zL2 + 0.2;
+        return {
+          polys: [
+            { pts: [[-w.g, zb], [-w.g, za]], two: false, normal: [-1, 0], refl: 1, y1, y2 },
+            { pts: [[w.g, zb], [w.g, za]], two: false, normal: [1, 0], refl: 1, y1, y2 },
+          ],
+          gap: { pts: [[-w.g, zb], [-w.g, za], [w.g, za], [w.g, zb]], y1, y2 },
+          meta: metaFrom('ip', y1, y2, [-w.g, w.g], [za, zb]),
+        };
+      }
       h = h == null ? Math.min(w.rf + 0.8, w.T * 0.3) : h;
       const z0 = w.T - h;
       return {
@@ -171,7 +184,7 @@
   UT.randomDefects = function (w, seed, count) {
     const rnd = UT.rng(seed);
     const R = (a, b) => a + rnd() * (b - a);
-    const pool = ['lof', 'ip', 'porositas', 'slag', 'crack', 'root-crack'];
+    const pool = ['lof', 'ip', 'porositas', 'slag', 'crack', 'root-crack'].filter((t) => !(w.type === 'X' && t === 'root-crack'));
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -190,8 +203,13 @@
       };
       if (t === 'lof') {
         const side = rnd() < 0.5 ? -1 : 1;
-        const z1 = T * R(0.15, 0.4);
-        const z2 = Math.min(z1 + T * R(0.2, 0.38), rfTop - 0.5);
+        let z1 = T * R(0.15, 0.4);
+        let z2 = Math.min(z1 + T * R(0.2, 0.38), rfTop - 0.5);
+        if (w.type === 'X') {
+          // hindari root face di tengah: pilih separuh atas atau bawah
+          if (rnd() < 0.5) { z1 = T * R(0.08, 0.2); z2 = Math.max(z1 + 1, w.zL1 - 0.5); }
+          else { z1 = w.zL2 + 0.5; z2 = Math.max(z1 + 1, T * R(0.8, 0.92)); }
+        }
         const [ya, yb] = span(15, 40);
         return D.lof(w, side, z1, z2, ya, yb);
       }
@@ -225,6 +243,13 @@
     return merge(parts);
   };
 
+  // Kedalaman LOF untuk skenario tetap: pada bevel X dibatasi ke separuh atas (hindari root face).
+  const lofZ = (w, f1, f2) => (w.type === 'X' ? [w.T * 0.1, w.zL1 - 0.5] : [w.T * f1, w.T * f2]);
+  // Kedalaman di dalam logam las yang cukup lebar (bevel X sempit di tengah tebal)
+  const weldZ = (w, f) => (w.type === 'X' ? w.T * Math.min(f, 0.3) : w.T * f);
+  // Posisi x di dalam las pada kedalaman z (frac = bagian dari setengah lebar las yang aman)
+  const inWeldX = (w, z, frac) => frac * Math.max(0, UT.fusionX(w, z, 1) - 2.5);
+
   UT.SCENARIOS = [
     {
       id: 'none',
@@ -236,13 +261,13 @@
       id: 'lof-kiri',
       name: 'Lack of sidewall fusion – sisi kiri',
       desc: 'Tidak menyatu pada dinding bevel kiri. Paling jelas bila berkas tegak lurus bevel: dari probe di kiri lewat leg 2, atau dari probe di kanan lewat leg 1 (jika terjangkau).',
-      build: (w) => merge([D.lof(w, -1, w.T * 0.28, w.T * 0.62, 130, 168)]),
+      build: (w) => merge([D.lof(w, -1, ...lofZ(w, 0.28, 0.62), 130, 168)]),
     },
     {
       id: 'lof-kanan',
       name: 'Lack of sidewall fusion – sisi kanan',
       desc: 'Tidak menyatu pada dinding bevel kanan. Coba scan dari kedua sisi las dan bandingkan amplitudonya.',
-      build: (w) => merge([D.lof(w, +1, w.T * 0.28, w.T * 0.62, 125, 160)]),
+      build: (w) => merge([D.lof(w, +1, ...lofZ(w, 0.28, 0.62), 125, 160)]),
     },
     {
       id: 'ip',
@@ -254,13 +279,13 @@
       id: 'porositas',
       name: 'Porositas (kluster)',
       desc: 'Sekumpulan pori gas kecil. Echo lemah, lebar dan berpuncak banyak; amplitudo berubah cepat saat probe digeser.',
-      build: (w) => merge([D.porositas(w, -w.topHalf * 0.15, w.T * 0.45, Math.min(1, w.T / 20), 150)]),
+      build: (w) => merge([D.porositas(w, -inWeldX(w, weldZ(w, 0.45), 0.25), weldZ(w, 0.45), Math.min(1, w.T / 20), 150)]),
     },
     {
       id: 'slag',
       name: 'Slag inclusion',
       desc: 'Terak terperangkap di dalam las. Echo sedang dan bergerigi, bentuknya berubah saat probe digeser atau diputar.',
-      build: (w) => merge([D.slag(w, w.topHalf * 0.25, w.T * 0.5, 144, 158)]),
+      build: (w) => merge([D.slag(w, inWeldX(w, weldZ(w, 0.5), 0.5), weldZ(w, 0.5), 144, 158)]),
     },
     {
       id: 'crack',
@@ -279,9 +304,9 @@
       name: 'Campuran (LOF kanan + porositas + slag)',
       desc: 'Beberapa cacat sekaligus. Latih membedakan jenis cacat dari posisi, bentuk echo, dan perilakunya saat probe digeser dari kedua sisi.',
       build: (w) => merge([
-        D.lof(w, +1, w.T * 0.2, w.T * 0.42, 95, 122),
-        D.slag(w, -w.topHalf * 0.2, w.T * 0.62, 160, 171),
-        D.porositas(w, w.topHalf * 0.1, w.T * 0.8, 0.7, 215),
+        D.lof(w, +1, ...lofZ(w, 0.2, 0.42), 95, 122),
+        D.slag(w, -inWeldX(w, w.type === 'X' ? w.T * 0.72 : w.T * 0.62, 0.4), w.type === 'X' ? w.T * 0.72 : w.T * 0.62, 160, 171),
+        D.porositas(w, inWeldX(w, w.type === 'X' ? w.T * 0.25 : w.T * 0.8, 0.2), w.type === 'X' ? w.T * 0.25 : w.T * 0.8, 0.7, 215),
       ]),
     },
     {

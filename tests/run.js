@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
+['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
 const UT = globalThis.UT;
 const C = UT.CONFIG;
 
@@ -273,6 +273,93 @@ test('laporan HTML: escape input pengguna dan memuat nilai', () => {
   assert.ok(html.includes('Budi &amp; &lt;Ani&gt;'));
   assert.ok(!html.includes('<script>x</script>'));
   assert.ok(html.includes('Nilai: <b>100</b>'));
+});
+
+console.log('Bevel X/U, B-scan, S-scan, TOFD (v0.4)');
+test('profil fusi V/X/U kontinu dan monoton menurut kedalaman', () => {
+  ['V', 'X', 'U'].forEach((bt) => {
+    const w = UT.buildWeld(Object.assign({}, C.defaults, { bevelType: bt, T: 25 }));
+    let prev = UT.fusionX(w, 0, 1);
+    for (let z = 0.05; z <= 25; z += 0.05) {
+      const x = UT.fusionX(w, z, 1);
+      assert.ok(Math.abs(x - prev) < 1, `${bt}: loncatan di z=${z.toFixed(2)} (${prev.toFixed(2)} → ${x.toFixed(2)})`);
+      assert.ok(x >= w.g - 1e-9, `${bt}: x < setengah gap`);
+      prev = x;
+    }
+  });
+  const X = UT.buildWeld(Object.assign({}, C.defaults, { bevelType: 'X', T: 20 }));
+  near(X.topHalf, X.botHalf, 1e-9, 'X simetris');
+  near(UT.fusionX(X, 10, 1), X.g, 1e-9, 'root face X di tengah');
+});
+test('IP pada bevel X tertanam di tengah tebal (tanpa corner trap)', () => {
+  const sc = weldFor({ bevelType: 'X', T: 20, scenario: 'ip' }).scene;
+  const t = sc.truth[0];
+  assert.ok(t.z1 > 5 && t.z2 < 15, `kedalaman IP ${t.z1}–${t.z2}`);
+  assert.strictEqual(sc.corners.filter((c) => c.kind === 'cacat').length, 0);
+});
+const tofdRun = (scenario, T, y) => {
+  const spec = weldFor({ T, scenario });
+  const S = UT.tofdDefaultS(T, 60), W = UT.tofdWindow(S, T, C.material.vL);
+  const s = UT.simulateTOFD({ S, angle: 60, freq: 5, crystal: 6, y: y == null ? 150 : y, T, scene: spec.scene, grain: null, tStart: W.tStart, tEnd: W.tEnd, n: 4000, mat: C.material });
+  return { s, S, W, spec };
+};
+const tofdPeaks = (s, thr) => {
+  const out = [], dt = (s.tEnd - s.tStart) / (s.n - 1);
+  for (let i = 12; i < s.n - 12; i++) {
+    const v = Math.abs(s.re[i]);
+    if (v < thr) continue;
+    let ok = true;
+    for (let k = -12; k <= 12 && ok; k++) if (Math.abs(s.re[i + k]) > v) ok = false;
+    if (ok) out.push({ t: s.tStart + i * dt, v: s.re[i] });
+  }
+  return out;
+};
+test('TOFD: waktu gelombang lateral & back wall, kedalaman ↔ waktu saling invers', () => {
+  const { s, S, W } = tofdRun('none', 20);
+  near(W.tLat, (2 * S) / 5.92, 1e-9);
+  near(UT.tofdDepth(UT.tofdTime(13.3, S, 5920), S, 5920), 13.3, 1e-9);
+  assert.strictEqual(UT.tofdDepth(W.tLat - 0.5, S, 5920), null);
+  const pk = tofdPeaks(s, 0.05 * s.bwPeak);
+  assert.ok(pk.some((p) => Math.abs(p.t - W.tLat) < 0.05), 'puncak lateral');
+  assert.ok(pk.some((p) => Math.abs(p.t - W.tBw) < 0.05), 'puncak back wall');
+});
+test('TOFD: ujung retak terukur pada kedalaman sebenarnya dengan fase berlawanan', () => {
+  const { s, S, spec } = tofdRun('crack', 20);
+  const t = spec.scene.truth[0];
+  const pk = tofdPeaks(s, 0.04 * s.bwPeak).map((p) => ({ d: UT.tofdDepth(p.t, S, 5920), v: p.v })).filter((p) => p.d != null && p.d > 2 && p.d < 19);
+  const top = pk.reduce((a, p) => (Math.abs(p.d - t.z1) < Math.abs(a.d - t.z1) ? p : a));
+  const bot = pk.reduce((a, p) => (Math.abs(p.d - t.z2) < Math.abs(a.d - t.z2) ? p : a));
+  near(top.d, t.z1, 0.6, 'ujung atas');
+  near(bot.d, t.z2, 0.6, 'ujung bawah');
+  assert.ok(top.v < 0 && bot.v > 0, `fase atas ${top.v.toFixed(3)} / bawah ${bot.v.toFixed(3)}`);
+});
+test('TOFD: di luar panjang cacat sinyal ujung hilang', () => {
+  // dibandingkan terhadap pelat tanpa cacat agar gelombang lateral & back wall tidak ikut terhitung
+  const base = tofdRun('none', 20, 152).s.re;
+  const diff = (r) => { let m = 0; for (let i = 0; i < r.s.n; i++) m = Math.max(m, Math.abs(r.s.re[i] - base[i])); return m; };
+  const on = diff(tofdRun('crack', 20, 152)), off = diff(tofdRun('crack', 20, 260));
+  assert.ok(on > 0.1 && off < 1e-6, `${on} vs ${off}`);
+});
+test('S-scan: echo SDH terkuat pada sudut yang melewati lubang', () => {
+  const spec = UT.buildSpecimen({ specimen: 'asme', T: 20 });
+  const h = spec.holes[1]; // ½T
+  const x = h.x - h.z * Math.tan((55 * Math.PI) / 180); // probe diletakkan untuk sudut 55°
+  let best = { a: 0, amp: 0 };
+  UT.pautAngles().forEach((a) => {
+    const s = UT.simulate({ probe: { x, dir: 1, angle: a, freq: UT.PAUT.freq, crystal: UT.PAUT.aperture }, mat: C.material, T: 20, scene: { points: spec.scene.points, corners: [] }, grain: null, spStart: 5, spEnd: 30, n: 1500 });
+    const m = Math.max(...UT.envelopeBins(s.re, 100));
+    if (m > best.amp) best = { a, amp: m };
+  });
+  near(best.a, 55, 2, 'sudut terbaik');
+});
+test('akuisisi progresif mengisi semua kolom', () => {
+  const sc = new UT.ProgressiveScan(7, 5, (i) => Float32Array.from([i, i, i, i, i]));
+  sc.runAll();
+  assert.strictEqual(sc.progress, 1);
+  assert.strictEqual(sc.data[6 * 5 + 2], 6);
+  const env = UT.envelopeBins(Float32Array.from([0, -3, 1, 2, 0, 0]), 2);
+  assert.deepStrictEqual(Array.from(env), [3, 2]);
+  assert.deepStrictEqual(Array.from(UT.signedBins(Float32Array.from([0, -3, 1, 2, 0, 0]), 2)), [-3, 2]);
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

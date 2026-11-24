@@ -11,7 +11,7 @@
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.3 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.4 · acuan ASME Sec. V Art. 4</span>
     </div>
     <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
   </header>
@@ -36,6 +36,8 @@
           <li><b>Blok ASME – DAC:</b> maksimalkan echo SDH ¼T, ½T, ¾T lalu lanjutkan lewat leg 2 (¾T → 5/4T, ½T → 6/4T, ¼T → 7/4T) agar DAC mencakup satu skip penuh. Rekam setiap titik tanpa mengubah gain. Lalu “Gain = reference” dan “Gain scanning +6 dB”.</li>
           <li><b>Las:</b> scan, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, lihat hasil evaluasi ASME.</li>
         </ol>
+        <h3>Teknik</h3>
+        <p class="small"><b>UT konvensional</b>: A-scan + rekam B-scan. <b>Phased Array</b>: S-scan 40–70°, klik sektor untuk memilih sudut A-scan. <b>TOFD</b>: D-scan sepanjang las; klik gambar untuk memasang penanda kedalaman A/B dan mengukur tinggi cacat.</p>
         <h3>Tutorial &amp; ujian</h3>
         <p class="small">Pilih <b>Tutorial</b> untuk latihan terpandu, atau <b>Ujian</b> untuk soal acak dengan penilaian otomatis. Catat indikasi di kartu <b>Laporan indikasi</b>, lalu cetak atau unduh laporannya.</p>
       </div>
@@ -57,6 +59,14 @@
     <span class="modebar-label">Benda uji:</span>
     <div class="tabs" role="tablist" id="specTabs"></div>
     <span id="calBadge" class="badge"></span>
+  </nav>
+  <nav class="modebar" aria-label="Teknik">
+    <span class="modebar-label">Teknik:</span>
+    <div class="tabs" role="tablist" id="techTabs">
+      <button type="button" class="tab" role="tab" data-tech="ut">UT konvensional</button>
+      <button type="button" class="tab" role="tab" data-tech="paut">Phased Array (S-scan)</button>
+      <button type="button" class="tab" role="tab" data-tech="tofd">TOFD</button>
+    </div>
   </nav>
 
   <main class="views">
@@ -86,15 +96,19 @@
         <h2>A-scan</h2>
         <span id="satWarn" class="warn small" hidden>Saturasi &gt;100% FSH – turunkan gain</span>
       </div>
+      <div id="imgBar" class="imgbar small"></div>
+      <div id="imgWrap" hidden>
+        <div class="canvas-wrap"><canvas id="cvImg" aria-label="Citra B-scan, S-scan, atau D-scan TOFD"></canvas></div>
+      </div>
       <div class="canvas-wrap dark"><canvas id="cvAscan" aria-label="Layar A-scan"></canvas></div>
       <div class="readouts" aria-live="polite">
-        <div><span>Amplitudo</span><b id="roAmp">–</b></div>
-        <div><span>Terhadap DAC</span><b id="roDac">–</b></div>
-        <div><span>Sound path (SP)</span><b id="roSP">–</b></div>
-        <div><span>Kedalaman</span><b id="roDepth">–</b></div>
-        <div><span>Jarak permukaan</span><b id="roSD">–</b></div>
+        <div><span id="roAmpL">Amplitudo</span><b id="roAmp">–</b></div>
+        <div><span id="roDacL">Terhadap DAC</span><b id="roDac">–</b></div>
+        <div><span id="roSPL">Sound path (SP)</span><b id="roSP">–</b></div>
+        <div><span id="roDepthL">Kedalaman</span><b id="roDepth">–</b></div>
+        <div><span id="roSDL">Jarak permukaan</span><b id="roSD">–</b></div>
         <div><span id="roXLabel">Posisi thd sumbu las</span><b id="roX">–</b></div>
-        <div><span>Leg</span><b id="roLeg">–</b></div>
+        <div><span id="roLegL">Leg</span><b id="roLeg">–</b></div>
         <div><span id="roPLabel">Posisi probe (y)</span><b id="roP">–</b></div>
       </div>
       <div id="evalBox" class="evalbox" hidden></div>
@@ -108,7 +122,10 @@
         <select id="inT"></select>
       </label>
       <div id="weldOnly">
-        <label>Sudut bevel (½ sudut)
+        <label>Jenis bevel
+          <select id="inBevelType"></select>
+        </label>
+        <label id="lblBevel">Sudut bevel (½ sudut)
           <select id="inBevel"></select>
         </label>
         <label>Root gap (mm)
@@ -300,7 +317,7 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.3 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.4 · ray tracing 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
@@ -310,10 +327,12 @@
   <script src="src/calibration.js"></script>
   <script src="src/dac.js"></script>
   <script src="src/exam.js"></script>
+  <script src="src/imaging.js"></script>
   <script src="src/report.js"></script>
   <script src="src/render-section.js"></script>
   <script src="src/render-topview.js"></script>
   <script src="src/render-ascan.js"></script>
+  <script src="src/render-images.js"></script>
   <script src="src/main.js"></script>
   <script src="src/tutorial.js"></script>
   <script src="src/edu.js"></script>

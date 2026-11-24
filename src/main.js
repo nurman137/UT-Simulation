@@ -22,12 +22,21 @@
   const locks = { truth: false, scenario: false, autoCal: false };
   const frameHooks = [];
   let lastPct = null;
+  // v0.4: teknik pencitraan
+  let specVersion = 0;
+  let img = null; // UT.ProgressiveScan aktif (B-scan / S-scan / D-scan)
+  let imgKey = '';
+  let imgDrawKey = '';
+  const gainMem = { ut: null, paut: null, tofd: null };
+  const tofd = { mA: null, mB: null, hoverT: null, nextMark: 'mA' };
+  const isTech = (t) => S.technique === t;
 
   let spec, view = null, sim = null, derived = null, simDirty = true;
   let hoverSP = null, lastPeak = null;
-  const cvS = $('cvSection'), cvA = $('cvAscan'), cvT = $('cvTop');
-  const ctxS = cvS.getContext('2d'), ctxA = cvA.getContext('2d'), ctxT = cvT.getContext('2d');
-  let szA = { w: 0, h: 0 }, topLay = null;
+  const cvS = $('cvSection'), cvA = $('cvAscan'), cvT = $('cvTop'), cvI = $('cvImg');
+  const ctxS = cvS.getContext('2d'), ctxA = cvA.getContext('2d'), ctxT = cvT.getContext('2d'), ctxI = cvI.getContext('2d');
+  let szA = { w: 0, h: 0 }, szI = { w: 0, h: 0 }, topLay = null;
+  let lastAx = { delay: 0, range: 1 };
 
   const dir = () => (S.side === 'kiri' ? 1 : -1);
   const isWeld = () => spec && spec.type === 'las';
@@ -48,6 +57,16 @@
 
   const cal = () => ({ vTrue: C.material.vT, vUser: S.velocity, zeroTrue: H.zero, zeroUser: S.zero });
   const userIndexX = () => UT.userIndexX(S.probeX, dir(), H, S.xValue);
+  // Sudut & kristal efektif: Phased Array memakai sudut sektor terpilih dan aperture array
+  const physAngle = () => (isTech('paut') ? S.pautAngle : H.angle);
+  const userAngle = () => (isTech('paut') ? S.pautAngle : S.angleUser);
+  const probeFreq = () => (isTech('paut') ? UT.PAUT.freq : S.freq);
+  const probeCrystal = () => (isTech('paut') ? UT.PAUT.aperture : S.crystal);
+  const tofdS = () => S.tofdS || UT.tofdDefaultS(spec.T, UT.TOFD.angle);
+  const tofdOpts = (y, tStart, tEnd, n) => ({
+    S: tofdS(), angle: UT.TOFD.angle, freq: UT.TOFD.freq, crystal: UT.TOFD.crystal, y,
+    T: spec.T, scene: spec.scene, grain: S.grain ? spec.grain : null, tStart, tEnd, n, mat: C.material,
+  });
 
   // ---------------------------------------------------------------- model
   function defaultProbeX() {
@@ -79,6 +98,8 @@
 
   function rebuild(resetView = true) {
     spec = UT.buildSpecimen(S);
+    specVersion++;
+    if (img && img.meta.kind === 'bscan') img = null;
     clampProbe();
     if (resetView) view = null;
     simDirty = true;
@@ -97,11 +118,30 @@
     rebuild(false);
   }
 
-  function runSim() {
+  function simAt(x, y, angle, n) {
     const c = cal();
     const spStart = UT.spTrueFromUser(S.delay, c);
     const spEnd = UT.spTrueFromUser(S.delay + S.range, c);
-    const pr = { x: S.probeX, y: S.probeY, dir: dir(), angle: H.angle, freq: S.freq, crystal: S.crystal };
+    const pr = { x, y, dir: dir(), angle, freq: probeFreq(), crystal: probeCrystal() };
+    return UT.simulate({
+      probe: pr, mat: C.material, T: spec.T, scene: spec.scene,
+      grain: S.grain ? spec.grain : null, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
+    });
+  }
+
+  function runSim() {
+    if (isTech('tofd') && isWeld()) {
+      const W = UT.tofdWindow(tofdS(), spec.T, C.material.vL);
+      sim = UT.simulateTOFD(tofdOpts(S.probeY, W.tStart, W.tEnd, 2400));
+      sim.win = W;
+      derived = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: H.angle }, C.material);
+      simDirty = false;
+      return;
+    }
+    const c = cal();
+    const spStart = UT.spTrueFromUser(S.delay, c);
+    const spEnd = UT.spTrueFromUser(S.delay + S.range, c);
+    const pr = { x: S.probeX, y: S.probeY, dir: dir(), angle: physAngle(), freq: probeFreq(), crystal: probeCrystal() };
     derived = UT.probeDerived(pr, C.material);
     const n = Math.max(1200, Math.min(9000, Math.ceil((spEnd - spStart) / (derived.lambda / 20))));
     sim = UT.simulate({
@@ -133,6 +173,38 @@
       b.textContent = sp.name;
       b.addEventListener('click', () => setSpecimen(sp.id));
       tabs.appendChild(b);
+    });
+    document.querySelectorAll('#techTabs .tab').forEach((b) => b.addEventListener('click', () => setTechnique(b.dataset.tech)));
+    fillSelect($('inBevelType'), UT.BEVEL_TYPES, (t) => t.name, (t) => t.id);
+    $('inBevelType').addEventListener('change', (e) => { S.bevelType = e.target.value; resetSizing(); rebuild(); syncControls(); });
+    const bar = $('imgBar');
+    bar.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-b]');
+      if (!b) return;
+      const a = b.dataset.b;
+      if (a === 'x' || a === 'y') startBscan(a);
+      else if (a === 'close') { img = null; imgKey = ''; }
+      else if (a === 'pcsAuto') { S.tofdS = null; simDirty = true; updateInfo(); }
+      else if (a === 'clearMarks') { tofd.mA = tofd.mB = null; tofd.nextMark = 'mA'; }
+      bar.dataset.html = '';
+      renderImgBar();
+    });
+    bar.addEventListener('input', (e) => {
+      if (e.target.id === 'inPautA') {
+        S.pautAngle = +e.target.value;
+        simDirty = true;
+        updateInfo();
+        const o = e.target.parentElement.querySelector('b');
+        if (o) o.textContent = `${S.pautAngle}°`;
+      }
+    });
+    bar.addEventListener('change', (e) => {
+      if (e.target.id === 'inPcs') {
+        const v = parseFloat(e.target.value);
+        if (isFinite(v) && v >= 10) { S.tofdS = v / 2; simDirty = true; updateInfo(); }
+        bar.dataset.html = '';
+        renderImgBar();
+      }
     });
     fillSelect($('inT'), C.options.thicknesses, (v) => `${v} mm`);
     fillSelect($('inBevel'), C.options.bevels, (v) => `${v}° (sudut bevel total ${v * 2}°)`);
@@ -233,7 +305,7 @@
     $('btnY2').addEventListener('click', () => { sizing.y2 = S.probeY; renderSizing(); });
     const markDepth = (k) => () => {
       if (!lastPeak || !lastPeak.triggered) return;
-      sizing[k] = UT.locate(lastPeak.sp, S.angleUser, spec.T, userIndexX(), dir()).depth;
+      sizing[k] = UT.locate(lastPeak.sp, userAngle(), spec.T, userIndexX(), dir()).depth;
       renderSizing();
     };
     $('btnD1').addEventListener('click', markDepth('d1'));
@@ -266,6 +338,13 @@
 
   function setSpecimen(id) {
     if (S.specimen === id) return;
+    if (id !== 'las' && isTech('tofd')) {
+      gainMem.tofd = S.gain;
+      S.technique = 'ut';
+      if (gainMem.ut != null) S.gain = gainMem.ut;
+      img = null;
+      imgKey = '';
+    }
     S.specimen = id;
     if (id === 'las') Object.assign(S, { range: 125, delay: 0, gateStart: 40, gateWidth: 50 });
     if (id === 'iiw') Object.assign(S, { side: 'kiri', range: 250, delay: 0, gateStart: 80, gateWidth: 40 });
@@ -304,6 +383,14 @@
       b.setAttribute('aria-selected', String(on));
     });
     const weld = S.specimen === 'las';
+    document.querySelectorAll('#techTabs .tab').forEach((b) => {
+      const on = b.dataset.tech === S.technique;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    $('inBevelType').value = S.bevelType;
+    $('lblBevel').hidden = S.bevelType === 'U';
+    renderImgBar();
     $('weldOnly').hidden = !weld;
     $('topWrap').hidden = !weld;
     $('sizingCard').hidden = !weld;
@@ -316,8 +403,10 @@
     $('btnAutoCal').disabled = locks.autoCal;
     $('sectionTitle').textContent = weld ? 'Tampilan scanning (penampang las)'
       : `Tampilan scanning (${UT.SPECIMENS.find((s) => s.id === S.specimen).name})`;
-    $('roXLabel').textContent = weld ? 'Posisi thd sumbu las' : 'Posisi x pada blok';
-    $('roPLabel').textContent = weld ? 'Posisi probe (y)' : 'Tanda index pada blok';
+    if (roMode !== 'tofd') {
+      $('roXLabel').textContent = weld ? 'Posisi thd sumbu las' : 'Posisi x pada blok';
+      $('roPLabel').textContent = weld ? 'Posisi probe (y)' : 'Tanda index pada blok';
+    }
 
     $('inT').value = String(S.T);
     $('inBevel').value = String(S.bevelHalf);
@@ -417,9 +506,10 @@
 
   function updateInfo() {
     if (!spec) return;
-    const hs = spec.T * Math.tan(S.angleUser * DEG);
+    const hs = spec.T * Math.tan(userAngle() * DEG);
     $('skipInfo').textContent = spec.type === 'iiw' ? 'Tinggi blok 100 mm'
-      : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${S.angleUser}°)`;
+      : isTech('tofd') && isWeld() ? `TOFD · PCS = ${(2 * tofdS()).toFixed(1)} mm · ${UT.TOFD.freq} MHz L-wave ${UT.TOFD.angle}°`
+        : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${userAngle()}°)`;
     const d = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: S.angle }, C.material);
     $('probeInfo').textContent =
       `λ = ${d.lambda.toFixed(2)} mm · near field ≈ ${d.N.toFixed(0)} mm · sebaran berkas −6 dB ≈ ±${(d.gamma6 / DEG).toFixed(1)}°`;
@@ -523,9 +613,166 @@
     const r = cvA.getBoundingClientRect();
     const lay = UT.ascanLayout(szA.w, szA.h);
     const x = e.clientX - r.left - lay.L;
-    hoverSP = x < 0 || x > lay.w ? null : S.delay + (x / lay.w) * S.range;
+    const v = x < 0 || x > lay.w ? null : lastAx.delay + (x / lay.w) * lastAx.range;
+    if (isTech('tofd') && isWeld()) tofd.hoverT = v; else hoverSP = v;
   });
-  cvA.addEventListener('pointerleave', () => { hoverSP = null; });
+  cvA.addEventListener('pointerleave', () => { hoverSP = null; tofd.hoverT = null; });
+
+  // ---------------------------------------------------------------- citra: B-scan / S-scan / D-scan
+  function imgVisible() {
+    if (isTech('paut')) return true;
+    if (isTech('tofd')) return isWeld();
+    return !!(img && img.meta.kind === 'bscan');
+  }
+
+  function startBscan(axis) {
+    const rows = 256, n = 2400;
+    const meta = { kind: 'bscan', axis, delay: S.delay, range: S.range };
+    if (axis === 'y') {
+      if (!isWeld()) return;
+      const cols = 151, step = spec.yLen / (cols - 1), x = S.probeX, ang = physAngle();
+      Object.assign(meta, { x0: 0, x1: spec.yLen });
+      img = new UT.ProgressiveScan(cols, rows, (c) => UT.envelopeBins(simAt(x, c * step, ang, n).re, rows), meta);
+    } else {
+      const lim = limits(), y = S.probeY, ang = physAngle();
+      const cols = Math.max(20, Math.min(200, Math.round(lim.max - lim.min) + 1));
+      Object.assign(meta, { x0: lim.min, x1: lim.max });
+      img = new UT.ProgressiveScan(cols, rows, (c) => UT.envelopeBins(simAt(lim.min + (c * (lim.max - lim.min)) / (cols - 1), y, ang, n).re, rows), meta);
+    }
+    imgKey = 'b' + Date.now();
+  }
+
+  function updateImage() {
+    if (isTech('paut')) {
+      const key = ['s', specVersion, S.probeX, S.probeY, S.side, S.delay, S.range, S.velocity, S.zero, S.grain, H.front, H.zero].join('|');
+      if (key !== imgKey) {
+        imgKey = key;
+        const angles = UT.pautAngles(), rows = 240;
+        img = new UT.ProgressiveScan(angles.length, rows, (i) => UT.envelopeBins(simAt(S.probeX, S.probeY, angles[i], 1600).re, rows), { kind: 'sscan', angles });
+      }
+    } else if (isTech('tofd') && isWeld()) {
+      const key = ['d', specVersion, tofdS(), S.grain].join('|');
+      if (key !== imgKey) {
+        imgKey = key;
+        const W = UT.tofdWindow(tofdS(), spec.T, C.material.vL);
+        const rows = 260, cols = 151, step = spec.yLen / (cols - 1);
+        img = new UT.ProgressiveScan(cols, rows, (c) => UT.signedBins(UT.simulateTOFD(tofdOpts(c * step, W.tStart, W.tEnd, 1300)).re, rows), { kind: 'dscan', W, step });
+      }
+    }
+    if (img && img.done < img.count) img.step(10);
+  }
+
+  function imgOpts(gl) {
+    const m = img.meta;
+    if (m.kind === 'sscan') {
+      return { angles: m.angles, rows: img.rows, data: img.data, done: img.done, gainLin: gl,
+        spStart: Math.max(0, S.delay), spEnd: S.delay + S.range, T: spec.T, selAngle: S.pautAngle };
+    }
+    if (m.kind === 'dscan') {
+      const W = m.W, Sx = tofdS(), vL = C.material.vL;
+      const hl = [];
+      if (tofd.mA != null) hl.push({ y: UT.tofdTime(tofd.mA, Sx, vL), color: '#ff8c00', label: `A ${tofd.mA.toFixed(1)} mm` });
+      if (tofd.mB != null) hl.push({ y: UT.tofdTime(tofd.mB, Sx, vL), color: '#7b2cbf', label: `B ${tofd.mB.toFixed(1)} mm` });
+      return { cols: img.count, rows: img.rows, data: img.data, done: img.done, gainLin: gl, rf: true,
+        xMin: 0, xMax: spec.yLen, xLabel: 'posisi sepanjang las y (mm)', yMin: W.tStart, yMax: W.tEnd,
+        yLabel: 'kedalaman (mm)', yFmt: (t) => { const d = UT.tofdDepth(t, Sx, vL); return d == null ? '' : d.toFixed(0); },
+        hLines: hl, vLines: [{ x: S.probeY, color: '#0077cc', dash: [4, 3] }], cursorY: tofd.hoverT };
+    }
+    return { cols: img.count, rows: img.rows, data: img.data, done: img.done, gainLin: gl, rf: false,
+      xMin: m.x0, xMax: m.x1, xLabel: m.axis === 'y' ? 'posisi sepanjang las y (mm)' : 'posisi exit point x (mm)',
+      yMin: m.delay, yMax: m.delay + m.range, yLabel: 'SP (mm)',
+      vLines: [{ x: m.axis === 'y' ? S.probeY : S.probeX, color: '#0077cc', dash: [4, 3] }] };
+  }
+
+  function drawImage(ri, gl) {
+    szI = ri;
+    if (!img) return;
+    const key = [img.done, imgKey, gl, ri.w, ri.h, ri.changed, S.pautAngle, S.probeY, S.probeX, tofd.mA, tofd.mB, tofd.hoverT].join('|');
+    if (key === imgDrawKey) return;
+    imgDrawKey = key;
+    ctxI.setTransform(ri.dpr, 0, 0, ri.dpr, 0, 0);
+    const lay = UT.imageLayout(ri.w, ri.h);
+    if (img.meta.kind === 'sscan') UT.drawSScan(ctxI, lay, imgOpts(gl));
+    else UT.drawImageScan(ctxI, lay, imgOpts(gl));
+  }
+
+  cvI.addEventListener('pointermove', (e) => {
+    if (!img || img.meta.kind !== 'dscan') return;
+    const lay = UT.imageLayout(szI.w, szI.h);
+    const { py } = canvasPos(cvI, e);
+    const W = img.meta.W;
+    tofd.hoverT = py < lay.T || py > lay.T + lay.h ? null : W.tStart + ((py - lay.T) / lay.h) * (W.tEnd - W.tStart);
+  });
+  cvI.addEventListener('pointerleave', () => { tofd.hoverT = null; });
+  cvI.addEventListener('click', (e) => {
+    if (!img) return;
+    const lay = UT.imageLayout(szI.w, szI.h);
+    const { px, py } = canvasPos(cvI, e);
+    const m = img.meta;
+    if (m.kind === 'sscan') {
+      const a = UT.sscanAngleAt(lay, imgOpts(1), px, py);
+      if (a == null) return;
+      S.pautAngle = Math.round(Math.min(UT.PAUT.maxA, Math.max(UT.PAUT.minA, a)));
+      simDirty = true;
+      updateInfo();
+      renderImgBar();
+      return;
+    }
+    const fx = (px - lay.L) / lay.w;
+    if (fx < 0 || fx > 1) return;
+    if (m.kind === 'dscan') {
+      moveProbeY(fx * spec.yLen);
+      const t = m.W.tStart + ((py - lay.T) / lay.h) * (m.W.tEnd - m.W.tStart);
+      const d = UT.tofdDepth(t, tofdS(), C.material.vL);
+      if (d != null && py >= lay.T && py <= lay.T + lay.h) {
+        tofd[tofd.nextMark] = d;
+        tofd.nextMark = tofd.nextMark === 'mA' ? 'mB' : 'mA';
+      }
+      return;
+    }
+    const pos = m.x0 + fx * (m.x1 - m.x0);
+    if (m.axis === 'y') moveProbeY(pos); else { moveProbeTo(pos); ensureView(); }
+  });
+
+  // Bilah kontrol citra sesuai teknik
+  function renderImgBar() {
+    const bar = $('imgBar');
+    let html = '';
+    if (isTech('paut')) {
+      html = `<b>S-scan</b> <span class="muted">${UT.PAUT.elements} elemen · ${UT.PAUT.freq} MHz · ${UT.PAUT.minA}–${UT.PAUT.maxA}° · klik sektor untuk memilih sudut</span>
+        <label class="inl">Sudut A-scan <input id="inPautA" type="range" min="${UT.PAUT.minA}" max="${UT.PAUT.maxA}" step="1" value="${S.pautAngle}"> <b>${S.pautAngle}°</b></label>`;
+    } else if (isTech('tofd')) {
+      html = isWeld()
+        ? `<b>TOFD D-scan</b> <label class="inl">PCS <input id="inPcs" type="number" min="10" max="300" step="1" value="${(2 * tofdS()).toFixed(0)}"> mm</label>
+          <button type="button" class="btn" data-b="pcsAuto">PCS otomatis (⅔T)</button>
+          <button type="button" class="btn" data-b="clearMarks">Hapus penanda</button>
+          <span class="muted small">Klik gambar: pindahkan probe ke posisi y tersebut dan pasang penanda kedalaman A/B.</span>`
+        : '<b>TOFD</b> <span class="muted">hanya untuk benda uji las.</span>';
+    } else {
+      html = `<b>B-scan</b> <button type="button" class="btn" data-b="y"${isWeld() ? '' : ' disabled'}>Rekam sepanjang las (y)</button>
+        <button type="button" class="btn" data-b="x">Rekam melintang (x)</button>
+        ${img && img.meta.kind === 'bscan' ? '<button type="button" class="btn" data-b="close">Tutup</button>' : ''}
+        <span class="muted small">Klik gambar untuk memindahkan probe.</span>`;
+    }
+    if (bar.dataset.html !== html) { bar.innerHTML = html; bar.dataset.html = html; }
+  }
+
+  function setTechnique(t) {
+    if (t === S.technique) return;
+    gainMem[S.technique] = S.gain;
+    if (t === 'tofd' && !isWeld()) setSpecimen('las');
+    S.technique = t;
+    if (gainMem[t] != null) S.gain = gainMem[t];
+    else if (t === 'tofd') S.gain = 46;
+    img = null;
+    imgKey = '';
+    tofd.mA = tofd.mB = tofd.hoverT = null;
+    tofd.nextMark = 'mA';
+    view = null;
+    simDirty = true;
+    updateInfo();
+    syncControls();
+  }
 
   // ---------------------------------------------------------------- render
   function resizeCanvas(cv, h) {
@@ -548,19 +795,28 @@
     const hT = isWeld() ? (stacked ? 110 : 130) : 0;
     const wA = cvA.parentElement.clientWidth;
     const hSide = Math.max(300, hS + (hT ? hT + 24 : 0));
+    const showImg = imgVisible();
+    $('imgWrap').hidden = !showImg;
     const rs = resizeCanvas(cvS, hS);
-    const ra = resizeCanvas(cvA, stacked ? Math.round(Math.min(420, Math.max(240, wA * 0.6))) : hSide);
+    let hA = stacked ? Math.round(Math.min(420, Math.max(240, wA * 0.6))) : hSide;
+    let hI = 0;
+    if (showImg) {
+      hI = stacked ? Math.round(Math.min(380, Math.max(240, wA * 0.7))) : Math.max(220, Math.round(hSide * 0.58));
+      hA = stacked ? 220 : Math.max(180, hSide - hI);
+    }
+    const ra = resizeCanvas(cvA, hA);
     szA = ra;
     if (rs.changed) view = null;
     if (!view) view = UT.computeView(rs.w, rs.h, UT.viewExtent(spec, S, dir(), H));
     if (simDirty) runSim();
 
+    const tofdOn = isTech('tofd') && isWeld();
     // Sinyal tampilan (%FSH) + noise elektronik
     const gl = C.GAIN_K * Math.pow(10, S.gain / 20);
     const n = sim.n;
     const disp = new Float32Array(n);
     const en = C.ELECTRONIC_NOISE;
-    const rf = S.rect === 'rf';
+    const rf = tofdOn || S.rect === 'rf';
     let maxAmp = 0;
     for (let i = 0; i < n; i++) {
       const v = (sim.re[i] + (Math.random() - 0.5) * 2 * en) * gl;
@@ -568,18 +824,22 @@
       const a = Math.abs(v);
       if (a > maxAmp) maxAmp = a;
     }
-    const spOf = (i) => S.delay + (i * S.range) / (n - 1);
+    const axDelay = tofdOn ? sim.tStart : S.delay;
+    const axRange = tofdOn ? sim.tEnd - sim.tStart : S.range;
+    lastAx = { delay: axDelay, range: axRange };
+    const spOf = (i) => axDelay + (i * axRange) / (n - 1);
     const gStart = S.gateStart, gEnd = S.gateStart + S.gateWidth;
-    const peak = UT.gatePeak(disp, spOf, gStart, gEnd, S.gateLevel);
+    const peak = tofdOn ? { amp: 0, sp: null, idx: -1, triggered: false } : UT.gatePeak(disp, spOf, gStart, gEnd, S.gateLevel);
     lastPeak = peak;
-    $('satWarn').hidden = maxAmp < 100;
+    $('satWarn').hidden = maxAmp < 100 || tofdOn;
 
-    const dacOn = S.showDac && dac.points.length > 0;
+    const dacOn = !tofdOn && S.showDac && dac.points.length > 0;
     ctxA.setTransform(ra.dpr, 0, 0, ra.dpr, 0, 0);
     UT.drawAscan(ctxA, UT.ascanLayout(ra.w, ra.h), {
-      disp, rect: S.rect, delay: S.delay, range: S.range,
-      gate: { start: gStart, end: gEnd, level: S.gateLevel },
-      peak, hoverSP,
+      disp, rect: rf ? 'rf' : 'full', delay: axDelay, range: axRange,
+      xLabel: tofdOn ? 'waktu (µs)' : 'SP (mm)',
+      gate: tofdOn ? null : { start: gStart, end: gEnd, level: S.gateLevel },
+      peak, hoverSP: tofdOn ? tofd.hoverT : hoverSP,
       dacCurve: dacOn ? (sp) => UT.dacAt(dac, sp, S.gain) : null,
       dacPoints: dacOn ? dac.points.map((p) => ({ sp: p.sp, amp: Math.pow(10, (p.db + S.gain) / 20) })) : null,
     });
@@ -588,10 +848,14 @@
     const spMaxTrue = Math.max(1, UT.spTrueFromUser(S.delay + S.range, cal()));
     ctxS.setTransform(rs.dpr, 0, 0, rs.dpr, 0, 0);
     UT.drawSection(ctxS, view, {
-      spec, state: S, dir: dir(), H, derived, spMaxTrue,
-      gate: { start: gStart, end: gEnd },
+      spec, state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), derived, spMaxTrue,
+      crystal: probeCrystal(),
+      gate: tofdOn ? null : { start: gStart, end: gEnd },
       peakSP: peak.triggered ? peak.sp : null,
-      hoverSP, userIndexX: uIdx, angleUser: S.angleUser, showTruth: S.showDefects,
+      hoverSP: tofdOn ? null : hoverSP, userIndexX: uIdx, angleUser: userAngle(), showTruth: S.showDefects,
+      technique: tofdOn ? 'tofd' : S.technique,
+      pautAngles: isTech('paut') ? [UT.PAUT.minA, UT.PAUT.maxA] : null,
+      tofd: tofdOn ? { S: tofdS(), angle: UT.TOFD.angle, hoverDepth: tofd.hoverT == null ? null : UT.tofdDepth(tofd.hoverT, tofdS(), C.material.vL) } : null,
     });
 
     if (hT) {
@@ -599,10 +863,17 @@
       topLay = UT.topLayout(rt.h, spec.yLen);
       ctxT.setTransform(rt.dpr, 0, 0, rt.dpr, 0, 0);
       UT.drawTopView(ctxT, Object.assign({}, view, { cw: rt.w }), topLay, {
-        spec, state: S, dir: dir(), H, sizing, showTruth: S.showDefects,
+        spec, state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), sizing, showTruth: S.showDefects,
+        tofdS: tofdOn ? tofdS() : null,
       });
     } else {
       topLay = null;
+    }
+
+    if (showImg) {
+      updateImage();
+      const ri = resizeCanvas(cvI, hI);
+      drawImage(ri, gl);
     }
 
     updateReadouts(peak, uIdx);
@@ -611,13 +882,57 @@
     requestAnimationFrame(frame);
   }
 
+  const RO_LABELS = {
+    def: ['Amplitudo', 'Terhadap DAC', 'Sound path (SP)', 'Kedalaman', 'Jarak permukaan', null, 'Leg', null],
+    tofd: ['Waktu (kursor)', 'Kedalaman (kursor)', 'Penanda A', 'Penanda B', 'Tinggi |B − A|', 'PCS', 'Lateral / back wall', 'Posisi probe (y)'],
+  };
+  const RO_IDS = ['roAmpL', 'roDacL', 'roSPL', 'roDepthL', 'roSDL', 'roXLabel', 'roLegL', 'roPLabel'];
+  let roMode = '';
+  function setRoLabels(mode) {
+    if (mode === roMode) return;
+    roMode = mode;
+    RO_LABELS[mode].forEach((t, i) => { if (t) $(RO_IDS[i]).textContent = t; });
+    if (mode === 'def') syncControls();
+  }
+
+  function updateTofdReadouts() {
+    setRoLabels('tofd');
+    const Sx = tofdS(), vL = C.material.vL;
+    const d = tofd.hoverT == null ? null : UT.tofdDepth(tofd.hoverT, Sx, vL);
+    const W = sim.win;
+    const ro = {
+      amp: tofd.hoverT == null ? '–' : `${tofd.hoverT.toFixed(2)} µs`,
+      dac: d == null ? '–' : `${d.toFixed(1)} mm`,
+      sp: tofd.mA == null ? '–' : `${tofd.mA.toFixed(1)} mm`,
+      depth: tofd.mB == null ? '–' : `${tofd.mB.toFixed(1)} mm`,
+      sd: tofd.mA != null && tofd.mB != null ? `${Math.abs(tofd.mB - tofd.mA).toFixed(1)} mm` : '–',
+      x: `${(2 * Sx).toFixed(1)} mm`,
+      leg: `${W.tLat.toFixed(2)} / ${W.tBw.toFixed(2)} µs`,
+      p: `${S.probeY.toFixed(1)} mm`,
+    };
+    const key = 'tofd' + JSON.stringify(ro);
+    if (key === lastRo) return;
+    lastRo = key;
+    $('roAmp').textContent = ro.amp;
+    $('roDac').textContent = ro.dac;
+    $('roSP').textContent = ro.sp;
+    $('roDepth').textContent = ro.depth;
+    $('roSD').textContent = ro.sd;
+    $('roX').textContent = ro.x;
+    $('roLeg').textContent = ro.leg;
+    $('roP').textContent = ro.p;
+    $('evalBox').hidden = true;
+  }
+
   let lastRo = '';
   function updateReadouts(peak, uIdx) {
+    if (isTech('tofd') && isWeld()) { updateTofdReadouts(); return; }
+    setRoLabels('def');
     const ro = { amp: `${peak.amp.toFixed(0)}%`, dac: '–', sp: '–', depth: '–', sd: '–', x: '–', leg: '–' };
     let pct = null;
     lastPct = null;
     if (peak.triggered) {
-      const l = UT.locate(peak.sp, S.angleUser, spec.T, uIdx, dir());
+      const l = UT.locate(peak.sp, userAngle(), spec.T, uIdx, dir());
       ro.amp = peak.amp >= 100 ? '>100%' : `${peak.amp.toFixed(0)}%`;
       ro.sp = `${fmt(peak.sp)} mm`;
       ro.depth = `${fmt(l.depth)} mm`;
@@ -681,14 +996,15 @@
     rebuild, setSpecimen, syncControls, newProbe, clearDac, resetSizing, setGain, renderSizing,
     applyUserFromTruth, userIndexX, cal,
     setSide,
+    setTechnique,
     dir,
     calOk() {
       return UT.calibrationStatus(H, { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity }, C.material.vT).ok;
     },
     /** Pembacaan alat untuk puncak gate saat ini, atau null. */
     reading() {
-      if (!lastPeak || !lastPeak.triggered || !spec) return null;
-      const l = UT.locate(lastPeak.sp, S.angleUser, spec.T, userIndexX(), dir());
+      if (!lastPeak || !lastPeak.triggered || !spec || isTech('tofd')) return null;
+      const l = UT.locate(lastPeak.sp, userAngle(), spec.T, userIndexX(), dir());
       return { sp: lastPeak.sp, amp: lastPeak.amp, depth: l.depth, x: l.x, sd: l.sd, leg: l.leg, pct: lastPct };
     },
     forceSim() { simDirty = true; view = null; },

@@ -11,6 +11,18 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 
 ## Fitur
 
+### v0.4 – B-scan, Phased Array, TOFD & bevel X/U
+- **Pemilih teknik**: UT konvensional, Phased Array (S-scan), dan TOFD.
+- **B-scan** (UT konvensional): rekam sepanjang las (y) atau melintang (x). Gambar amplitudo terhadap SP, ikut berubah saat gain diubah. Klik gambar untuk memindahkan probe.
+- **Phased Array S-scan**: array 16 elemen, 5 MHz, sektor 40–70° dalam koordinat sebenarnya, dengan garis T/2T/3T. Klik sektor atau geser slider untuk memilih sudut A-scan. Gate, DAC, dan pembacaan berlaku untuk sudut terpilih.
+- **TOFD**: pemancar dan penerima gelombang longitudinal 60°, 5 MHz, dengan PCS otomatis (perpotongan berkas di ⅔T) atau manual.
+  - Sinyal yang disimulasikan: gelombang lateral, back wall, dan difraksi ujung cacat dengan fase yang benar (ujung atas terbalik, ujung bawah sefase dengan lateral).
+  - D-scan grayscale sepanjang las dan A-scan RF.
+  - Kedalaman dihitung dari d = √((v·t/2)² − S²). Penanda A/B untuk mengukur tinggi cacat.
+- **Bevel X (V ganda)** dengan root face di tengah tebal, cap di kedua sisi, dan IP tertanam tanpa corner trap.
+- **Bevel U** dengan jari-jari akar 5 mm dan dinding 10°.
+- Posisi cacat menyesuaikan jenis bevel. Tutorial dan ujian tetap memakai UT konvensional dan bevel V.
+
 ### v0.3 – Tutorial, ujian & laporan
 - **Pemilih aktivitas**: Bebas, Tutorial, dan Ujian.
 - **Tutorial terpandu** dengan 4 pelajaran. Setiap langkah dicek otomatis dari state simulator, ditambah kuis isian:
@@ -72,8 +84,10 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 | Noise | Titik hambur butir yang tetap posisinya (speckle konsisten saat probe digeser) + noise elektronik |
 | Panjang cacat | Profil berkas Gaussian searah sumbu las. Di ujung reflektor panjang amplitudo turun tepat 6 dB |
 | Waktu alat | t = 2·SP/v + zero (wedge). Pembacaan alat memakai velocity dan zero yang dimasukkan pengguna |
+| Phased Array | Setiap sudut sektor disimulasikan sebagai berkas dengan aperture array (9,6 mm) dari exit point yang sama. Fokus elektronik belum dimodelkan |
+| TOFD | Pitch-catch gelombang longitudinal (5920 m/s). Back wall dan cacat dijumlahkan sebagai titik hambur Huygens, sehingga difraksi ujung dan fasenya muncul dari interferensi. Lateral wave = fraksi tetap dari back wall |
 
-Model ini disederhanakan untuk edukasi (2D, tanpa konversi mode penuh, tanpa anisotropi). Nilai amplitudonya bersifat kualitatif dan tidak menggantikan latihan dengan alat dan spesimen nyata.
+Model ini disederhanakan untuk edukasi (2D, tanpa konversi mode penuh, tanpa anisotropi, tanpa fokus elektronik pada Phased Array). Nilai amplitudonya bersifat kualitatif dan tidak menggantikan latihan dengan alat dan spesimen nyata.
 
 ## Struktur proyek
 
@@ -88,6 +102,8 @@ src/specimens.js        benda uji: las, blok IIW (V1), blok kalibrasi dasar ASME
 src/calibration.js      kebenaran probe tersembunyi, pemetaan zero/velocity, X-value
 src/dac.js              DAC, reference level, evaluasi ASME App. 12
 src/exam.js             soal acak, DAC otomatis, penilaian ujian
+src/imaging.js          B-scan, S-scan Phased Array, simulasi TOFD, akuisisi progresif
+src/render-images.js    gambar B-scan/D-scan dan sektor S-scan
 src/report.js           laporan inspeksi HTML (cetak/PDF/unduh)
 src/tutorial.js         definisi pelajaran tutorial
 src/edu.js              UI aktivitas: tutorial, ujian, tabel laporan
@@ -107,4 +123,4 @@ node tests/run.js
 
 ## Rencana berikutnya
 
-Lihat [docs/ROADMAP.md](docs/ROADMAP.md). Rencana berikutnya (v0.4): B-scan/S-scan (Phased Array), TOFD, bevel X/U, dan geometri pipa.
+Lihat [docs/ROADMAP.md](docs/ROADMAP.md). Rencana berikutnya (v0.5): geometri pipa (las girth), material austenitik, dan rekap nilai ujian satu kelas.

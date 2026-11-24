@@ -172,6 +172,13 @@ kbd {
 .readouts b { font: 600 15px ui-monospace, Menlo, Consolas, monospace; }
 
 .subhead { margin: 8px 0 4px; }
+.imgbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 6px; }
+.imgbar .btn { padding: 2px 8px; }
+.imgbar .inl { display: inline-flex; align-items: center; gap: 6px; }
+.imgbar input[type="number"] { width: 70px; font: inherit; padding: 2px 4px; border: 1px solid var(--line); border-radius: 4px; }
+.imgbar input[type="range"] { width: 140px; }
+#imgWrap { margin-bottom: 8px; }
+#cvImg { cursor: crosshair; }
 
 .evalbox {
   margin-top: 8px;

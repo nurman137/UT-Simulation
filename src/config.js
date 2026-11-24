@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.3.0',
+    version: '0.4.0',
 
     // Material benda uji (v0.1: baja karbon saja)
     material: {
@@ -42,6 +42,10 @@
 
     defaults: {
       specimen: 'las',
+      technique: 'ut',
+      pautAngle: 60,
+      tofdS: null,
+      bevelType: 'V',
       probeY: 150,
       // Benda uji
       T: 20,

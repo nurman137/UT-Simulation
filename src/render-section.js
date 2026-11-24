@@ -42,6 +42,10 @@
       return { x0: spec.xMin - 8, x1: spec.xMax + 8, z0, z1 };
     }
     const w = spec.weld;
+    if (state.technique === 'tofd') {
+      const Sx = state.tofdS || UT.tofdDefaultS(w.T, UT.TOFD.angle);
+      return { x0: -Sx - 34, x1: Sx + 34, z0, z1 };
+    }
     const hs = w.T * Math.tan(state.angle * DEG);
     const skip = 2 * hs;
     const near = skip + UT.PROBE_BODY + 4;
@@ -94,6 +98,12 @@
 
     if (o.state.showDefects && o.spec.type === 'las') drawDefects(ctx, o.spec.scene, X, Z, o.state.probeY);
 
+    if (o.technique === 'tofd') {
+      drawTofd(ctx, o, X, Z);
+      ctx.restore();
+      return;
+    }
+    if (o.technique === 'paut' && o.state.showBeam) drawFan(ctx, o, X, Z, o.spMaxTrue);
     if (o.state.showBeam) drawBeam(ctx, o, X, Z, o.spMaxTrue);
     drawSkipMarks(ctx, o, X, Z);
 
@@ -123,11 +133,7 @@
     ctx.fillStyle = COL.plate;
     ctx.fillRect(X(px0), Z(0), X(px1) - X(px0), Z(T) - Z(0));
 
-    const fusionPoly = (side, off) => [
-      [side * (w.topHalf + off), 0],
-      [side * (w.g + off), T - w.rf],
-      [side * (w.g + off), T],
-    ];
+    const fusionPoly = (side, off) => UT.fusionProfile(w, side, off);
     ctx.fillStyle = COL.haz;
     [-1, 1].forEach((side) => {
       const a = fusionPoly(side, 0), b = fusionPoly(side, 2.2);
@@ -138,20 +144,17 @@
       ctx.fill();
     });
 
+    // Logam las: cap → profil fusi kanan (turun) → root bead / cap sisi kedua → profil fusi kiri (naik)
     ctx.beginPath();
     ctx.moveTo(X(-w.capHalf), Z(0));
     if (w.capH > 0) ctx.quadraticCurveTo(X(0), Z(-2 * w.capH), X(w.capHalf), Z(0));
     else ctx.lineTo(X(w.topHalf), Z(0));
-    ctx.lineTo(X(w.topHalf), Z(0));
-    ctx.lineTo(X(w.g), Z(T - w.rf));
-    ctx.lineTo(X(w.g), Z(T));
+    fusionPoly(1, 0).forEach((p) => ctx.lineTo(X(p[0]), Z(p[1])));
     if (bead) {
       ctx.lineTo(X(w.rootHalf), Z(T));
       ctx.quadraticCurveTo(X(0), Z(T + 2 * w.rootH), X(-w.rootHalf), Z(T));
     }
-    ctx.lineTo(X(-w.g), Z(T));
-    ctx.lineTo(X(-w.g), Z(T - w.rf));
-    ctx.lineTo(X(-w.topHalf), Z(0));
+    fusionPoly(-1, 0).reverse().forEach((p) => ctx.lineTo(X(p[0]), Z(p[1])));
     ctx.closePath();
     ctx.fillStyle = COL.weld;
     ctx.fill();
@@ -185,8 +188,8 @@
     ctx.beginPath();
     ctx.moveTo(X(px0), Z(0)); ctx.lineTo(X(-w.capHalf), Z(0));
     ctx.moveTo(X(w.capHalf), Z(0)); ctx.lineTo(X(px1), Z(0));
-    ctx.moveTo(X(px0), Z(T)); ctx.lineTo(X(bead ? -w.rootHalf : -w.g), Z(T));
-    ctx.moveTo(X(bead ? w.rootHalf : w.g), Z(T)); ctx.lineTo(X(px1), Z(T));
+    ctx.moveTo(X(px0), Z(T)); ctx.lineTo(X(bead ? -w.rootHalf : -w.botHalf), Z(T));
+    ctx.moveTo(X(bead ? w.rootHalf : w.botHalf), Z(T)); ctx.lineTo(X(px1), Z(T));
     if (px0 === spec.xMin) { ctx.moveTo(X(px0), Z(0)); ctx.lineTo(X(px0), Z(T)); }
     if (px1 === spec.xMax) { ctx.moveTo(X(px1), Z(0)); ctx.lineTo(X(px1), Z(T)); }
     ctx.stroke();
@@ -355,8 +358,8 @@
     ctx.beginPath();
     for (let i = 0; i < steps; i++) {
       const a = i * h, b = (i + 1) * h;
-      const wa = UT.beamHalfWidth(a, o.state.crystal, pd.gamma6);
-      const wb = UT.beamHalfWidth(b, o.state.crystal, pd.gamma6);
+      const wa = UT.beamHalfWidth(a, o.crystal || o.state.crystal, pd.gamma6);
+      const wb = UT.beamHalfWidth(b, o.crystal || o.state.crystal, pd.gamma6);
       const p1 = foldedPoint(o, a, -wa), p2 = foldedPoint(o, b, -wb);
       const p3 = foldedPoint(o, b, wb), p4 = foldedPoint(o, a, wa);
       ctx.moveTo(X(p1.x), Z(p1.z));
@@ -432,6 +435,94 @@
       ctx.moveTo(cx, cz - 9); ctx.lineTo(cx, cz + 9);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  // ------------------------------------------------------------------ Phased Array: kipas sektor
+  function drawFan(ctx, o, X, Z, spMax) {
+    const [a0, a1] = o.pautAngles;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(123,44,191,0.28)';
+    ctx.lineWidth = 1;
+    for (let a = a0; a <= a1; a += 5) {
+      strokeRay(ctx, X, Z, o.spec.T, a, o.state.probeX, o.dir, 0, spMax);
+    }
+    ctx.restore();
+  }
+
+  // ------------------------------------------------------------------ TOFD: pemancar & penerima
+  function drawTofd(ctx, o, X, Z) {
+    const T = o.spec.T, Sx = o.tofd.S, th = o.tofd.angle * DEG;
+    const wd = UT.CONFIG.wedge;
+    const gam = 14 * DEG; // sebaran berkas lebar khas probe TOFD (tampilan)
+    ctx.save();
+    // kerucut berkas
+    [[-Sx, 1], [Sx, -1]].forEach(([x0, d]) => {
+      ctx.beginPath();
+      ctx.moveTo(X(x0), Z(0));
+      [th - gam, th + gam].forEach((a, i) => {
+        const L = T / Math.cos(a);
+        const xe = x0 + d * L * Math.sin(a);
+        if (i === 0) ctx.lineTo(X(xe), Z(T)); else ctx.lineTo(X(xe), Z(T));
+      });
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,150,255,0.14)';
+      ctx.fill();
+      ctx.strokeStyle = '#0077cc';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(X(x0), Z(0));
+      ctx.lineTo(X(x0 + d * T * Math.tan(th)), Z(T));
+      ctx.stroke();
+    });
+    // lintasan gelombang lateral dan back wall
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = 'rgba(0,119,204,0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(X(-Sx), Z(0.6)); ctx.lineTo(X(Sx), Z(0.6));
+    ctx.moveTo(X(-Sx), Z(0)); ctx.lineTo(X(0), Z(T)); ctx.lineTo(X(Sx), Z(0));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // kedalaman kursor
+    if (o.tofd.hoverDepth != null && o.tofd.hoverDepth <= T) {
+      const d = o.tofd.hoverDepth;
+      ctx.strokeStyle = COL.marker;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(X(-Sx), Z(0)); ctx.lineTo(X(0), Z(d)); ctx.lineTo(X(Sx), Z(0));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(X(0), Z(d), 5, 0, 2 * Math.PI);
+      ctx.stroke();
+    }
+    // probe
+    [[-Sx, 1, 'Tx'], [Sx, -1, 'Rx']].forEach(([x0, d, lab]) => {
+      const xf = x0 + d * 8, xb = x0 - d * 22, hf = wd.height * 0.55, hb = wd.height;
+      ctx.beginPath();
+      ctx.moveTo(X(xb), Z(0)); ctx.lineTo(X(xf), Z(0)); ctx.lineTo(X(xf), Z(-hf)); ctx.lineTo(X(xb), Z(-hb));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(80,120,170,0.35)';
+      ctx.fill();
+      ctx.strokeStyle = COL.probe;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.moveTo(X(x0), Z(0)); ctx.lineTo(X(x0) - 5, Z(0) - 8); ctx.lineTo(X(x0) + 5, Z(0) - 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = COL.text;
+      ctx.font = 'bold 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(lab, X((xf + xb) / 2), Z(-hb) - 8);
+    });
+    ctx.fillStyle = COL.muted;
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`PCS ${(2 * Sx).toFixed(1)} mm · L-wave ${o.tofd.angle}°`, X(0), Z(-wd.height) - 26);
     ctx.restore();
   }
 
