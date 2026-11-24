@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
+['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap', 'scanplan'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
 const UT = globalThis.UT;
 const C = UT.CONFIG;
 
@@ -571,6 +571,84 @@ test('scan sejajar: probe tidak bisa di atas las bila cap masih ada', () => {
   const sp = weldFor({ T: 20, cap: true });
   assert.ok(Math.abs(UT.lateralLimit(sp, 0)) >= sp.weld.capHalf + 10);
   assert.strictEqual(UT.lateralLimit(weldFor({ T: 20, cap: false }), 0), 0);
+});
+
+// ---- v0.7: probe lurus, laminasi, bayangan, rencana scan
+const sim0 = (sp, x, o = {}) => UT.simulate(Object.assign({
+  probe: { x, y: 150, dir: 1, angle: 0, freq: 4, crystal: 10, wave: 'L' }, mat: C.material, T: sp.T,
+  scene: sp.scene, grain: null, weld: sp.weld, shadows: sp.scene.shadows || [], backwall: { flat: UT.flatBottomFn(sp) },
+  spStart: 0, spEnd: 70, n: 7000,
+}, o));
+const ampAt = (sim, sp0, w = 1.5) => {
+  let m = 0;
+  for (let i = 0; i < sim.n; i++) { const sp = sim.spStart + (i * (sim.spEnd - sim.spStart)) / (sim.n - 1); if (Math.abs(sp - sp0) <= w) m = Math.max(m, Math.abs(sim.re[i])); }
+  return m;
+};
+test('probe lurus 0°: echo back wall di T, 2T, 3T dengan amplitudo menurun', () => {
+  const sp = weldFor({ T: 20, scenario: 'none', angle: 0 });
+  const s = sim0(sp, -120);
+  const a1 = ampAt(s, 20), a2 = ampAt(s, 40), a3 = ampAt(s, 60);
+  assert.ok(a1 > a2 && a2 > a3 && a3 > 0, `${a1} ${a2} ${a3}`);
+  near(peakOf(Object.assign({}, s, { re: s.re.map((v, i) => (i < s.n * 10 / 70 ? 0 : v)) })).sp, 20, 0.3, 'BW pertama');
+});
+test('laminasi: echo berulang di d, 2d dan back wall hilang', () => {
+  const sp = weldFor({ T: 20, scenario: 'laminasi', angle: 0 });
+  const z = sp.scene.shadows[0].z;
+  const off = sim0(sp, -120), on = sim0(sp, -65);
+  assert.ok(ampAt(on, z, 0.8) > 0.5 * ampAt(off, 20), 'echo laminasi kuat');
+  assert.ok(ampAt(on, 2 * z, 0.8) > 0, 'echo ulang 2d');
+  assert.ok(ampAt(on, 20, 0.5) < 0.1 * ampAt(off, 20, 0.5), 'back wall hilang di atas laminasi');
+});
+test('bayangan laminasi melemahkan LOF bagi probe sudut yang berkasnya melewati laminasi', () => {
+  const sp = weldFor({ T: 20, scenario: 'laminasi-lof' });
+  const scene = { points: sp.scene.points.filter((p) => !p.rep), corners: [] };
+  const run = (sh) => {
+    let m = 0;
+    for (let x = -80; x <= -20; x += 1) {
+      const s = UT.simulate({ probe: { x, y: 150, dir: 1, angle: 60, freq: 4, crystal: 10 }, mat: C.material, T: 20, scene, grain: null, shadows: sh, spStart: 0, spEnd: 100, n: 4000 });
+      m = Math.max(m, peakOf(s).amp);
+    }
+    return m;
+  };
+  const free = run([]), shaded = run(sp.scene.shadows);
+  assert.ok(20 * Math.log10(free / shaded) > 6, `turun ${(20 * Math.log10(free / shaded)).toFixed(1)} dB`);
+});
+test('kalibrasi probe 0°: hanya zero & velocity yang dinilai', () => {
+  const H = UT.makeProbeTruth(0, () => 0.5);
+  assert.strictEqual(H.angle, 0);
+  const st = UT.calibrationStatus(H, { xValue: 0, angle: 45, zero: H.zero, velocity: C.materials.cs.vL }, C.materials.cs.vL);
+  assert.ok(st.ok && st.items.length === 2);
+});
+test('rencana scan: leg 2 dan dua sisi menaikkan cakupan; jarak terlalu pendek menurunkannya', () => {
+  const w = weldFor({ T: 20, scenario: 'none' }).weld;
+  const base = { crystal: 10, freq: 4, mat: C.material, wave: 'T', haz: 6, near: UT.minProbeDistance(w) };
+  const c1 = UT.coverage(w, Object.assign({}, base, { angles: [60], sides: ['kiri'], legs: 1, far: 100 }));
+  const c2 = UT.coverage(w, Object.assign({}, base, { angles: [60], sides: ['kiri'], legs: 2, far: 100 }));
+  const c3 = UT.coverage(w, Object.assign({}, base, { angles: [60], sides: ['kiri'], legs: 2, far: 50 }));
+  const c4 = UT.coverage(w, Object.assign({}, base, { angles: [45, 60], sides: ['kiri', 'kanan'], legs: 2, far: 50 }));
+  assert.ok(c1.pct < 60 && c1.uncovered > 0, `leg1 ${c1.pct}`);
+  near(c2.pct, 100, 0.01, 'leg 1–2');
+  assert.ok(c3.pct < c2.pct, `far 50: ${c3.pct}`);
+  near(c4.pct, 100, 0.01, '45+60 dua sisi');
+  let both = 0;
+  for (let k = 0; k < c4.count.length; k++) if (c4.roi[k] && c4.count[k] >= 2) both++;
+  assert.ok(both > 0, 'ada daerah ≥ 2 setup');
+});
+test('rencana scan: jarak skip sesuai T·tanθ', () => {
+  const w = weldFor({ T: 20, scenario: 'none' }).weld;
+  const d = UT.planDistances(w, 60, 6);
+  near(d.halfSkip, 20 * Math.tan(Math.PI / 3), 1e-9);
+  near(d.fullSkip, 2 * d.halfSkip, 1e-9);
+});
+test('service worker memuat semua skrip yang dipakai index.html', () => {
+  const fs = require('fs');
+  const root = path.join(__dirname, '..');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(srcs.length > 10);
+  srcs.concat(['css/style.css', 'manifest.webmanifest']).forEach((f) => assert.ok(sw.includes(`'./${f}'`) || sw.includes(`"./${f}"`), `${f} ada di cache`));
+  assert.ok(sw.includes(`ut-sim-v${C.version}`), 'nama cache mengikuti versi');
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

@@ -315,6 +315,16 @@
     return v;
   };
 
+  /** Apakah dasar benda uji di bawah posisi x rata (untuk echo back wall probe 0°). */
+  UT.flatBottomFn = function (spec) {
+    if (spec.type === 'par' || spec.type === 'asme') return () => true;
+    if (spec.type === 'v2') return () => false;
+    if (spec.type === 'iiw') return spec.face === 'B' ? () => true : (x) => x <= UT.IIW.r100.cx;
+    const w = spec.weld;
+    // di bawah las: root bead / cap sisi kedua tidak rata
+    return (x) => Math.abs(x) > (w.rootH > 0 ? w.rootHalf : w.botHalf) + 1;
+  };
+
   UT.buildSpecimen = function (S) {
     if (S.specimen === 'iiw') return buildIIW(S.iiwFace);
     if (S.specimen === 'v2') return buildV2(S.v2Face);

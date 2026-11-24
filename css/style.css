@@ -260,6 +260,11 @@ kbd {
 .rekapgrid { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: 14px; }
 .edu-head select { max-width: 140px; }
 
+.planrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 14px; }
+.planrow label { margin: 4px 0; }
+.planrow input[type="number"] { width: 90px; }
+.cov1 { color: rgba(0,170,90,0.9); } .cov2 { color: rgba(0,110,210,0.9); } .cov0 { color: rgba(220,40,40,0.9); }
+
 .randrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
 .randrow label { margin: 4px 0; }
 .randrow input[type="number"] { width: 100px; }

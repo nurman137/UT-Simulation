@@ -70,6 +70,8 @@
    * probe.wave: 'T' (gelombang geser, bawaan) atau 'L' (longitudinal).
    * opts.weld (opsional): model las untuk atenuasi lintasan di dalam logam las (material austenitik).
    * opts.coupling (opsional): { gain, yScale } rugi kopling & penyebaran berkas pada permukaan lengkung.
+   * opts.shadows (opsional): [{ z, x1, x2, y1, y2 }] bidang laminasi yang menghalangi berkas.
+   * opts.backwall (opsional): { flat(x) } echo back wall (dan kelipatannya) untuk probe lurus 0°.
    * Mengembalikan { re: Float32Array, spStart, spEnd, n }.
    */
   UT.simulate = function (opts) {
@@ -88,6 +90,7 @@
     const wK = (-wAtt * 2 * Math.LN10) / 20;
     const wW = opts.weld;
     const coup = opts.coupling || { gain: 1, yScale: 1 };
+    const shadows = opts.shadows || [];
     const yS = coup.yScale || 1;
     const xE = probe.x, dir = probe.dir;
     const yP = probe.y == null ? 0 : probe.y;
@@ -130,7 +133,25 @@
       const spread = Math.pow(N0 / Math.sqrt(N0 * N0 + r * r), 1.5);
       let a = Math.pow(0.5, q2) * spread * Math.exp(attK * r);
       if (wAtt > 0) a *= Math.exp(wK * weldLen(x, zu, r));
+      if (shadows.length) a *= shadowFactor(x, zu);
       return a;
+    }
+    // Bayangan laminasi: berkas yang melewati bidang laminasi (di bayangan leg mana pun) sebelum
+    // mencapai titik tujuan sebagian besar terhalang.
+    function shadowFactor(x, zu) {
+      let f = 1;
+      for (let i = 0; i < shadows.length; i++) {
+        const sh = shadows[i];
+        const lat = sh.y1 == null ? 1 : UT.yFactor(sh.y1, sh.y2, yP, 4);
+        if (lat < 0.02) continue;
+        for (let k = 1; ; k++) {
+          const zi = k % 2 ? (k - 1) * T + sh.z : k * T - sh.z;
+          if (zi >= zu - 0.3) break;
+          const xi = xE + ((x - xE) * zi) / zu;
+          if (xi >= sh.x1 && xi <= sh.x2) { f *= 1 - 0.95 * lat; break; }
+        }
+      }
+      return f;
     }
     // Panjang lintasan (satu arah) di dalam logam las sepanjang sinar terlipat dari exit point ke titik
     function weldLen(x, zu, r) {
@@ -213,6 +234,22 @@
       }
     }
 
+    // 3b) Echo back wall untuk probe lurus (0°): permukaan bawah datar memantul tegak lurus,
+    //     muncul berulang di T, 2T, 3T, … dan hilang di bawah laminasi.
+    if (opts.backwall && Math.abs(th) < (3 * Math.PI) / 180 && opts.backwall.flat(xE)) {
+      let shade = 1;
+      shadows.forEach((sh) => {
+        const lat = sh.y1 == null ? 1 : UT.yFactor(sh.y1, sh.y2, yP, Math.max(2, w0));
+        const over = UT.yFactor(sh.x1, sh.x2, xE, Math.max(1.5, w0));
+        shade *= 1 - 0.97 * lat * over;
+      });
+      for (let k = 1; k * T <= spEnd + win; k++) {
+        const r = k * T;
+        const a = 3.2 * shade * Math.pow(N0 / Math.sqrt(N0 * N0 + r * r), 0.5) * Math.exp(attK * r) * Math.pow(0.8, k - 1);
+        add(r, -a); // pantulan di permukaan bebas: fase terbalik
+      }
+    }
+
     // Rugi kopling (wedge pada permukaan lengkung) berlaku untuk semua echo dari benda uji
     if (coup.gain !== 1) for (let j = 0; j < n; j++) re[j] *= coup.gain;
 
@@ -221,12 +258,12 @@
       const mb = opts.mainBangSP;
       if (mb - win < spEnd) {
         const j0 = Math.max(0, Math.ceil((mb - win - spStart) / dsp));
-        const ring = 1.2 * halfLambda * 6; // panjang ringing
-        const j1 = Math.min(n - 1, Math.floor((mb + ring * 4 - spStart) / dsp));
+        const ring = 2.4 * halfLambda; // panjang ringing → dead zone beberapa mm
+        const j1 = Math.min(n - 1, Math.floor((mb + ring * 8 - spStart) / dsp));
         for (let j = j0; j <= j1; j++) {
           const u = spStart + j * dsp - mb;
           const env = u < 0 ? Math.exp(-u * u * invTau2) : Math.exp(-u / ring);
-          re[j] += 60 * env * Math.cos(kw * u);
+          re[j] += 20 * env * Math.cos(kw * u);
         }
       }
       // gema wedge (lemah, acak tetap) antara pulsa awal dan permukaan

@@ -38,6 +38,7 @@
   const ctxS = cvS.getContext('2d'), ctxA = cvA.getContext('2d'), ctxT = cvT.getContext('2d'), ctxI = cvI.getContext('2d');
   let szA = { w: 0, h: 0 }, szI = { w: 0, h: 0 }, topLay = null, topView = null;
   let lastAx = { delay: 0, range: 1 };
+  let cov = null, covKey = '';
 
   const dir = () => (S.side === 'kiri' ? 1 : -1);
   const isWeld = () => spec && spec.type === 'las';
@@ -99,6 +100,7 @@
       const xs = UT.ASME_BLOCK.holesX;
       return dir() > 0 ? xs[0] - spec.T * 0.25 * tn - 10 : xs[2] + spec.T * 0.75 * tn + 10;
     }
+    if (H.angle === 0) return -dir() * ((spec.weld ? spec.weld.capHalf : 0) + 45);
     return -dir() * 1.75 * spec.T * tn;
   }
 
@@ -147,11 +149,12 @@
       const ps = UT.parallelSpec(spec);
       // probe di atas logam las → seluruh lintasan di logam las (penting untuk las austenitik)
       ps.grain.inWeld.fill(Math.abs(S.probeY) < spec.weld.topHalf ? 1 : 0);
-      return { T: ps.T, scene: ps.scene, grain: S.grain ? ps.grain : null, weld: null, coupling: NO_COUPLING };
+      return { T: ps.T, scene: ps.scene, grain: S.grain ? ps.grain : null, weld: null, coupling: NO_COUPLING, backwall: { flat: UT.flatBottomFn(ps) } };
     }
     return {
       T: spec.T, scene: spec.scene, grain: S.grain ? spec.grain : null,
       weld: isWeld() ? spec.weld : null, coupling: couplingNow(),
+      shadows: spec.scene.shadows || [], backwall: { flat: UT.flatBottomFn(spec) },
     };
   }
 
@@ -243,7 +246,8 @@
     });
     fillSelect($('inT'), C.options.thicknesses, (v) => `${v} mm`);
     fillSelect($('inBevel'), C.options.bevels, (v) => `${v}° (sudut bevel total ${v * 2}°)`);
-    fillSelect($('inAngle'), C.options.angles, (v) => `${v}°`);
+    fillSelect($('inAngle'), C.options.angles, (v) => (v === 0 ? '0° (probe lurus)' : `${v}°`));
+    S._prevAngle = S.angle;
     fillSelect($('inFreq'), C.options.freqs, (v) => `${v} MHz`);
     fillSelect($('inCrystal'), C.options.crystals, (v) => `${v} mm`);
     fillSelect($('inScenario'), UT.SCENARIOS, (s) => s.name, (s) => s.id);
@@ -290,6 +294,17 @@
     $('inMaterial').addEventListener('change', (e) => setMaterial(e.target.value));
     $('inWave').addEventListener('change', (e) => setWave(e.target.value));
     $('inOrient').addEventListener('change', (e) => setOrient(e.target.value));
+    // Rencana scan
+    S.plan = Object.assign({}, C.defaults.plan, S.plan || {});
+    $('inPlanOn').addEventListener('change', (e) => { S.plan.on = e.target.checked; syncControls(); });
+    document.querySelectorAll('[data-plan-angle]').forEach((cb) => cb.addEventListener('change', () => {
+      S.plan.angles = Array.from(document.querySelectorAll('[data-plan-angle]')).filter((c) => c.checked).map((c) => +c.dataset.planAngle);
+    }));
+    $('inPlanSides').addEventListener('change', (e) => { S.plan.sides = e.target.value; });
+    $('inPlanLegs').addEventListener('change', (e) => { S.plan.legs = +e.target.value; });
+    [['inPlanNear', 'near'], ['inPlanFar', 'far'], ['inPlanHaz', 'haz']].forEach(([id, k]) => {
+      $(id).addEventListener('change', (e) => { const v = parseFloat(e.target.value); S.plan[k] = isFinite(v) ? v : null; });
+    });
     sel('inGeom', 'geom', null, () => { resetSizing(); rebuild(); renderDac(); });
     sel('inOD', 'OD', parseFloat, () => { resetSizing(); rebuild(); renderDac(); });
     chk('inContour', 'contour', () => { simDirty = true; updateInfo(); renderDac(); });
@@ -299,7 +314,16 @@
     chk('inCap', 'cap', () => rebuild());
     chk('inRoot', 'rootBead', () => rebuild());
     const probeChanged = (what) => { clearDac(`${what} probe berubah`); newProbe(training); };
-    sel('inAngle', 'angle', parseFloat, () => { probeChanged('sudut'); S.probeX = null; rebuild(); });
+    sel('inAngle', 'angle', parseFloat, () => {
+      // probe lurus 0° memakai gelombang longitudinal; probe sudut kembali ke gelombang geser
+      if (S.angle === 0) S.wave = 'L';
+      else if (S._prevAngle === 0) S.wave = 'T';
+      S._prevAngle = S.angle;
+      probeChanged('sudut');
+      S.velocity = trueV();
+      S.probeX = null;
+      rebuild();
+    });
     sel('inFreq', 'freq', parseFloat, () => probeChanged('frekuensi'));
     sel('inCrystal', 'crystal', parseFloat, () => probeChanged('ukuran kristal'));
     $('sideL').addEventListener('click', () => setSide('kiri'));
@@ -448,6 +472,26 @@
     syncControls();
   }
 
+  /** Hitung ulang peta cakupan rencana scan bila pengaturannya berubah. */
+  function updateCoverage() {
+    if (!S.plan.on || !isWeld() || isPar()) return;
+    const w = spec.weld, P = S.plan;
+    const near = P.near != null ? P.near : UT.minProbeDistance(w);
+    const maxA = Math.max(...(P.angles.length ? P.angles : [60]));
+    const far = P.far != null ? P.far : Math.round(UT.planDistances(w, maxA, P.haz).farTopLeg2 + 5);
+    const sides = P.sides === 'keduanya' ? ['kiri', 'kanan'] : [P.sides];
+    const key = [specVersion, P.angles.join(','), P.sides, P.legs, near, far, P.haz, S.crystal, S.freq, S.material, S.wave].join('|');
+    if (key === covKey) return;
+    covKey = key;
+    if (!P.angles.length) { cov = null; $('planOut').textContent = 'Pilih minimal satu sudut.'; return; }
+    cov = UT.coverage(w, { angles: P.angles, sides, near, far, legs: P.legs, haz: P.haz, crystal: S.crystal, freq: S.freq, mat: C.material, wave: S.wave });
+    if (document.activeElement !== $('inPlanNear')) $('inPlanNear').value = near.toFixed(0);
+    if (document.activeElement !== $('inPlanFar')) $('inPlanFar').value = far.toFixed(0);
+    const per = P.angles.map((a) => `${a}°: ${cov.perAngle[a].toFixed(0)}%`).join(' · ');
+    const dist = P.angles.map((a) => { const d = UT.planDistances(w, a, P.haz); return `${a}°: ½ skip ${d.halfSkip.toFixed(0)} mm, sampai tepi zona seberang lewat leg 2 ≈ ${d.farTopLeg2.toFixed(0)} mm`; }).join('; ');
+    $('planOut').innerHTML = `<b>Cakupan zona pemeriksaan: ${cov.pct.toFixed(1)}%</b>${cov.uncovered ? ' <span class="warn">(ada daerah merah tidak tercakup)</span>' : ' ✓'}<br>Per sudut: ${per}<br><span class="muted">Jarak exit point: ${dist}.</span>`;
+  }
+
   function setMaterial(id) {
     if (S.material === id) return;
     S.material = id;
@@ -502,6 +546,7 @@
     $('inBevelType').value = S.bevelType;
     $('inMaterial').value = S.material;
     $('inWave').value = S.wave;
+    $('inWave').disabled = S.angle === 0 || locks.scenario;
     $('inGeom').value = S.geom;
     $('inOD').value = String(S.OD);
     $('lblOD').hidden = !(weld && S.geom === 'pipa') && !(S.specimen === 'asme' && S.asmeCurved);
@@ -569,6 +614,12 @@
     $('inVel').value = S.velocity;
     $('inShowDac').checked = S.showDac;
     $('inTcg').checked = !!S.tcg;
+    $('planCard').hidden = !weld;
+    $('inPlanOn').checked = !!S.plan.on;
+    document.querySelectorAll('[data-plan-angle]').forEach((c) => { c.checked = S.plan.angles.includes(+c.dataset.planAngle); });
+    $('inPlanSides').value = S.plan.sides;
+    $('inPlanLegs').value = String(S.plan.legs);
+    $('inPlanHaz').value = S.plan.haz;
     $('inScenario').value = S.scenario;
     $('scenarioDesc').textContent = !weld ? 'Skenario cacat hanya berlaku pada benda uji las.'
       : locks.scenario ? 'Mode ujian: cacat dirahasiakan sampai jawaban dikirim.' : UT.findScenario(S.scenario).desc;
@@ -661,7 +712,8 @@
     $('skipInfo').textContent = spec.type === 'iiw' ? `Blok V1 sisi ${spec.face} · 300 × 100 mm`
       : spec.type === 'v2' ? `Blok V2 ${spec.face === 'B' ? 'sisi miring' : 'sisi atas'} · R25 & R50 sepusat, lubang Ø5`
       : isTech('tofd') && isWeld() ? `TOFD · PCS = ${(2 * tofdS()).toFixed(1)} mm · ${UT.TOFD.freq} MHz L-wave ${UT.TOFD.angle}°`
-        : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${userAngle()}°)`;
+        : userAngle() === 0 ? `Probe lurus 0° · back wall di ${spec.T} mm, ${2 * spec.T} mm, …`
+          : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${userAngle()}°)`;
     const d = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: S.angle, wave: S.wave }, C.material);
     const cp = couplingNow();
     $('probeInfo').textContent =
@@ -1044,6 +1096,7 @@
 
     const uIdx = userIndexX();
     const spMaxTrue = Math.max(1, UT.spTrueFromUser(S.delay + S.range, cal()));
+    updateCoverage();
     ctxS.setTransform(rs.dpr, 0, 0, rs.dpr, 0, 0);
     UT.drawSection(ctxS, view, {
       spec: aspec(), state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), derived, spMaxTrue,
@@ -1054,6 +1107,7 @@
       technique: tofdOn ? 'tofd' : S.technique,
       pautAngles: isTech('paut') ? [UT.PAUT.minA, UT.PAUT.maxA] : null,
       tofd: tofdOn ? { S: tofdS(), angle: UT.TOFD.angle, hoverDepth: tofd.hoverT == null ? null : UT.tofdDepth(tofd.hoverT, tofdS(), C.material.vL) } : null,
+      coverage: S.plan.on && isWeld() && !isPar() && !tofdOn ? cov : null,
     });
 
     if (hT) {
@@ -1164,7 +1218,7 @@
 
     // Evaluasi (hanya las)
     let ev = null;
-    if (isWeld() && peak.triggered) {
+    if (isWeld() && peak.triggered && userAngle() !== 0) {
       const L = sizing.y1 != null && sizing.y2 != null ? Math.abs(sizing.y2 - sizing.y1) : null;
       ev = UT.evaluateASME({ pctDAC: pct, dacExists: dac.points.length > 0, type: S.indType, length: L, t: spec.T });
     }
@@ -1220,6 +1274,8 @@
       return { sp: lastPeak.sp, amp: lastPeak.amp, depth: l.depth, x: l.x, sd: l.sd, leg: l.leg, pct: lastPct };
     },
     forceSim() { simDirty = true; view = null; },
+    /** Peta cakupan rencana scan terakhir (null bila tidak aktif). */
+    coverage() { updateCoverage(); return S.plan.on ? cov : null; },
   };
 
   // ---------------------------------------------------------------- start

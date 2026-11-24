@@ -21,6 +21,8 @@
       gain: 46, rect: 'full', gateLevel: 20, grain: true, showBeam: true, probeY: 150,
     }, o || {});
     S.probeX = null;
+    S._prevAngle = S.angle;
+    S.plan = Object.assign({}, UT.CONFIG.defaults.plan, { on: false });
   }
 
   // Titik puncak gate menurut SP yang diharapkan (untuk DAC)
@@ -29,6 +31,7 @@
     return app.dac.points.some((p) => Math.abs(p.sp - sp) <= 2.5);
   };
   const lofTruth = (app) => (app.spec.scene.truth || [])[0];
+  const lamTruth = (app) => { const sh = (app.spec.scene.shadows || [])[0]; return sh ? sh.z : null; };
 
   UT.LESSONS = [
     {
@@ -486,6 +489,112 @@
         {
           title: 'Selesai',
           text: 'Reflektor melintang dicari dengan berkas sejajar sumbu las: di atas las bila cap digerinda, atau di samping las dengan berkas miring ke arah las. Retak melintang tidak dapat diterima berapa pun panjangnya.',
+        },
+      ],
+    },
+    {
+      id: 'lurus',
+      title: '10. Probe lurus 0°: back wall & laminasi',
+      desc: 'Memeriksa logam induk dengan probe lurus: back wall, echo laminasi, dan efek bayangan pada probe sudut.',
+      setup(app) {
+        baseSetup(app, { scenario: 'laminasi', showDefects: true, angle: 0, wave: 'L', gain: 38, velocity: UT.CONFIG.materials.cs.vL });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('las');
+        Object.assign(app.S, { gateStart: 14, gateWidth: 12, probeX: -130, probeY: 150 });
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Probe lurus',
+          text: 'Probe 0° memancarkan gelombang longitudinal tegak lurus permukaan. Pada pelat sehat A-scan menampilkan pulsa awal (main bang) di kiri, lalu echo back wall (dinding belakang) pada SP = T, 2T, 3T, … yang makin kecil. Sebelum memeriksa las dengan probe sudut, ASME Sec. V Art. 4 meminta logam induk yang akan dilalui berkas sudut diperiksa dulu dengan probe lurus untuk mencari reflektor seperti laminasi.',
+        },
+        {
+          title: 'Back wall',
+          text: 'Probe berada di logam induk yang sehat. Pastikan echo back wall pertama berada di dalam Gate A (start 14 mm, lebar 12 mm) dengan tinggi ≥ 50% FSH; atur gain bila perlu.',
+          check: (app, pk) => pk && pk.triggered && pk.amp >= 50 && Math.abs(pk.sp - app.spec.T) <= 1.5,
+        },
+        {
+          title: 'Ukur tebal',
+          text: 'Probe lurus juga dipakai sebagai pengukur tebal. Baca SP echo back wall pertama.',
+          quiz: { label: 'Tebal pelat', unit: 'mm', check: (v, app) => Math.abs(v - app.spec.T) <= 0.6 },
+        },
+        {
+          title: 'Cari laminasi',
+          text: 'Ubah Gate A menjadi start 3 mm, lebar 12 mm. Lalu geser probe ke arah las (→) sampai muncul echo di dalam gate, jauh sebelum back wall, ≥ 40% FSH.',
+          hint: 'Laminasi digambar sebagai garis mendatar merah di logam induk sisi kiri.',
+          check: (app, pk) => pk && pk.triggered && pk.amp >= 40 && pk.sp > 3 && pk.sp < app.spec.T * 0.8,
+        },
+        {
+          title: 'Kedalaman laminasi',
+          text: 'Perhatikan A-scan: echo laminasi berulang (d, 2d, 3d, …) dan back wall menghilang karena energi dipantulkan seluruhnya oleh laminasi. Berapa kedalamannya?',
+          quiz: { label: 'Kedalaman laminasi', unit: 'mm', check: (v, app) => { const t = lamTruth(app); return t && Math.abs(v - t) <= 0.8; } },
+        },
+        {
+          title: 'Bayangan bagi probe sudut',
+          text: 'Pilih skenario “Laminasi + LOF” (kartu Cacat & tampilan) dan sudut probe 60°. Laminasi berada di antara probe kiri dan las.',
+          check: (app) => app.S.scenario === 'laminasi-lof' && app.S.angle === 60,
+        },
+        {
+          title: 'LOF terhalang',
+          text: 'Cari LOF dari sisi kiri: berkas yang melewati laminasi terpantul sehingga LOF tampak lemah atau hilang. Sekarang pindah ke sisi kanan (tombol Kanan), atur Gate A (mis. start 10 mm, lebar 60 mm), dan temukan echo LOF ≥ 50% FSH.',
+          hint: 'Dari kanan, LOF di bevel kiri terkena leg 1 atau leg 2 tanpa melewati laminasi.',
+          check: (app, pk) => app.S.side === 'kanan' && pk && pk.triggered && pk.amp >= 50,
+        },
+        {
+          title: 'Selesai',
+          text: 'Laminasi dicari dengan probe lurus: echo sebelum back wall, berulang, dan back wall hilang. Laminasi membuat daerah bayangan bagi probe sudut, jadi area itu harus diperiksa dari sisi lain atau dengan teknik lain, dan dicatat di laporan.',
+        },
+      ],
+    },
+    {
+      id: 'cakupan',
+      title: '11. Rencana scan & cakupan',
+      desc: 'Menentukan sudut, sisi, leg, dan jarak probe supaya seluruh las + HAZ terlewati berkas.',
+      setup(app) {
+        baseSetup(app, { scenario: 'none', showDefects: true, angle: 60 });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('las');
+        Object.assign(app.S.plan, { on: false, angles: [60], sides: 'kiri', legs: 1, near: null, far: null, haz: 6 });
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Mengapa rencana scan',
+          text: 'Sebelum inspeksi, teknisi membuat rencana scan: sudut probe, sisi, leg, dan jarak gerak probe dari sumbu las, sehingga seluruh zona pemeriksaan (logam las + HAZ) dilalui berkas. Kartu “Rencana scan & cakupan” menghitungnya untuk benda uji saat ini.',
+        },
+        {
+          title: 'Tampilkan cakupan',
+          text: 'Centang “Tampilkan cakupan di penampang”. Mulai dengan 60°, sisi kiri saja, leg 1 saja.',
+          check: (app) => app.S.plan.on,
+        },
+        {
+          title: 'Baca cakupan',
+          text: 'Daerah merah tidak dilalui berkas: probe tidak bisa mendekat karena cap las, sehingga leg 1 tidak mencapai bagian atas las. Berapa persen cakupan yang tertulis?',
+          quiz: { label: 'Cakupan', unit: '%', check: (v, app) => { const c = app.coverage(); return c && Math.abs(v - c.pct) <= 1.5; } },
+        },
+        {
+          title: 'Tambahkan leg 2',
+          text: 'Ubah Leg menjadi “Leg 1–2”. Berkas yang memantul di dasar pelat menyapu bagian atas las.',
+          check: (app) => { const c = app.coverage(); return app.S.plan.legs === 2 && c && c.pct >= 99.5; },
+        },
+        {
+          title: 'Jarak gerak probe',
+          text: 'Cakupan bergantung pada seberapa jauh probe digeser. Isi “Jarak maks” 50 mm dan lihat daerah merah kembali muncul.',
+          check: (app) => { const c = app.coverage(); return app.S.plan.far != null && app.S.plan.far <= 55 && c && c.pct < 99; },
+        },
+        {
+          title: 'Rencana lengkap',
+          text: 'Tanpa mengubah jarak maks, tambahkan sudut kedua dan pilih “Kedua sisi” sampai cakupan 100%. Biru = daerah yang dilalui ≥ 2 setup (lebih andal untuk cacat planar berbagai orientasi).',
+          hint: 'Coba 70° lalu 45°. Sudut kecil punya skip pendek, sehingga leg 2 sudah mencapai bagian atas las walau probe hanya bergerak sampai 50 mm.',
+          check: (app) => { const c = app.coverage(); return app.S.plan.angles.length >= 2 && app.S.plan.sides === 'keduanya' && c && c.pct >= 99.9; },
+        },
+        {
+          title: 'Selesai',
+          text: 'Rencana scan yang baik memakai lebih dari satu sudut, dari dua sisi bila bisa, dengan jarak gerak probe minimal sampai leg 2 mencapai tepi zona seberang (≈ 1 skip + lebar las/2 + HAZ). Cakupan geometris adalah syarat perlu, bukan jaminan deteksi.',
         },
       ],
     },

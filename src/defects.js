@@ -203,6 +203,21 @@
       };
     },
   };
+  /**
+   * Laminasi: pemisahan berlapis di logam induk, sejajar permukaan, pada kedalaman z.
+   * Dari probe lurus 0° memberi echo kuat berulang (z, 2z, 3z) dan menghilangkan back wall;
+   * bagi probe sudut, laminasi menghalangi berkas yang melewatinya.
+   */
+  D.laminasi = function (w, x1, x2, z, y1, y2) {
+    const pts = [];
+    const n = Math.max(4, Math.round((x2 - x1) / 4));
+    for (let i = 0; i <= n; i++) pts.push([x1 + ((x2 - x1) * i) / n, z + (i % 2 ? 0.15 : -0.1)]);
+    return {
+      polys: [{ pts, two: true, refl: 1, y1, y2, rep: { n: 3, step: z, decay: 0.45 } }],
+      shadow: { z, x1, x2, y1, y2 },
+      meta: metaFrom('laminasi', y1, y2, [x1, x2], [z - 0.2, z + 0.2]),
+    };
+  };
   UT.DEFECT_BUILDERS = D;
 
   /**
@@ -237,8 +252,9 @@
 
   /** Gabungkan beberapa part cacat menjadi satu hasil skenario. */
   function merge(parts, T) {
-    const res = { polys: [], circles: [], corners: [], gaps: [], ipRanges: [], metas: [], par: { polys: [], circles: [], corners: [] } };
+    const res = { polys: [], circles: [], corners: [], gaps: [], ipRanges: [], metas: [], shadows: [], par: { polys: [], circles: [], corners: [] } };
     parts.forEach((p) => {
+      if (p.shadow) res.shadows.push(p.shadow);
       const pr = derivePar(p, T);
       res.par.polys.push(...pr.polys);
       res.par.circles.push(...pr.circles);
@@ -414,6 +430,18 @@
       build: (w) => merge([D.toeCrack(w, -1, 130, 160, Math.min(4, w.T * 0.25))], w.T),
     },
     {
+      id: 'laminasi',
+      name: 'Laminasi di logam induk (kiri)',
+      desc: 'Pemisahan berlapis di pelat, sejajar permukaan. Periksa logam induk dengan probe lurus 0°: echo laminasi muncul sebelum back wall dan back wall hilang. Laminasi juga menghalangi berkas probe sudut.',
+      build: (w) => merge([D.laminasi(w, -95, -38, w.T * 0.45, 90, 210)], w.T),
+    },
+    {
+      id: 'laminasi-lof',
+      name: 'Laminasi + LOF (bayangan berkas)',
+      desc: 'LOF sisi kiri dengan laminasi di logam induk di antara probe dan las. Dari sisi kiri berkas probe sudut terhalang laminasi sehingga LOF tampak lemah atau hilang; periksa dari sisi kanan atau periksa logam induk dulu dengan probe 0°.',
+      build: (w) => merge([D.lof(w, -1, ...lofZ(w, 0.28, 0.62), 130, 168), D.laminasi(w, -75, -30, w.T * 0.35, 100, 200)], w.T),
+    },
+    {
       id: 'campuran',
       name: 'Campuran (LOF kanan + porositas + slag)',
       desc: 'Beberapa cacat sekaligus. Latih membedakan jenis cacat dari posisi, bentuk echo, dan perilakunya saat probe digeser dari kedua sisi.',
@@ -504,6 +532,7 @@
       shapes: { polys: res.polys, circles: res.circles, gaps: res.gaps },
       ipRanges: res.ipRanges,
       truth: res.metas,
+      shadows: res.shadows,
       rootBead,
       par: { points: parPoints, corners: parCorners, shapes: { polys: res.par.polys.map(mapL), circles: res.par.circles.map(mapL), gaps: [] } },
     };

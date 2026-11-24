@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.6.0',
+    version: '0.7.0',
 
     // Material aktif (objek ini diperbarui oleh UT.setMaterial; referensinya tetap sama)
     material: {},
@@ -36,7 +36,7 @@
     wedge: { front: 10, back: 22, height: 16 },
 
     options: {
-      angles: [45, 60, 70],
+      angles: [0, 45, 60, 70],
       freqs: [2.25, 4, 5],
       crystals: [6, 10, 13, 20],
       thicknesses: [10, 12, 16, 20, 25, 32, 40],
@@ -55,6 +55,7 @@
 
     defaults: {
       specimen: 'las',
+      plan: { on: false, angles: [60], sides: 'keduanya', legs: 2, near: null, far: null, haz: 6 },
       orient: 'tegak',
       iiwFace: 'A',
       v2Face: 'A',

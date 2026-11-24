@@ -107,6 +107,7 @@
 
     drawScale(ctx, v, X, Z, o.spec);
 
+    if (o.coverage) drawCoverage(ctx, o.coverage, X, Z);
     if (o.state.showDefects && (o.spec.type === 'las' || o.spec.type === 'par')) drawDefects(ctx, o.spec.scene, X, Z, o.state.probeY);
 
     if (o.technique === 'tofd') {
@@ -324,6 +325,26 @@
     }
   }
 
+  // Peta cakupan rencana scan: hijau = 1 setup, biru = ≥ 2 setup, merah = zona tidak tercakup
+  function drawCoverage(ctx, cov, X, Z) {
+    ctx.save();
+    // tepi sel dibulatkan ke piksel agar sel tidak saling tumpang (tanpa garis kisi)
+    for (let iz = 0; iz < cov.nz; iz++) {
+      const z0 = Math.round(Z(iz * cov.dz)), z1 = Math.round(Z((iz + 1) * cov.dz));
+      if (z1 <= z0) continue;
+      for (let ix = 0; ix < cov.nx; ix++) {
+        const k = iz * cov.nx + ix;
+        if (!cov.roi[k]) continue;
+        const x0 = Math.round(X(cov.x0 + ix * cov.dx)), x1 = Math.round(X(cov.x0 + (ix + 1) * cov.dx));
+        if (x1 <= x0) continue;
+        const c = cov.count[k];
+        ctx.fillStyle = c === 0 ? 'rgba(220,40,40,0.55)' : c === 1 ? 'rgba(0,170,90,0.33)' : 'rgba(0,110,210,0.33)';
+        ctx.fillRect(x0, z0, x1 - x0, z1 - z0);
+      }
+    }
+    ctx.restore();
+  }
+
   function drawScale(ctx, v, X, Z, spec) {
     const step = v.s > 6 ? 5 : v.s > 2.5 ? 10 : 20;
     const start = Math.ceil(Math.max(v.x0, spec.xMin) / step) * step;
@@ -402,6 +423,8 @@
   function drawBeam(ctx, o, X, Z, spMax) {
     const pd = o.derived;
     spMax = Math.max(1, spMax);
+    // probe lurus: berkas cukup digambar sampai dasar (pantulan berikutnya menumpuk di jalur yang sama)
+    if (Math.abs(o.H.angle) < 1) spMax = Math.min(spMax, o.spec.T);
     const steps = Math.max(40, Math.ceil(spMax / 0.6));
     const h = spMax / steps;
     ctx.save();
@@ -455,6 +478,7 @@
 
   function drawSkipMarks(ctx, o, X, Z) {
     if (o.spec.type !== 'las' && o.spec.T > 60) return;
+    if (Math.abs(o.H.angle) < 1) return; // probe lurus: tidak ada skip
     const T = o.spec.T;
     const hs = T * Math.tan(o.H.angle * DEG);
     const labels = ['½ skip', '1 skip', '1½ skip', '2 skip'];
@@ -583,7 +607,39 @@
   }
 
   // ------------------------------------------------------------------ probe
+  function drawStraightProbe(ctx, o, X, Z) {
+    const xp = o.state.probeX, hw = o.H.front, h = 20;
+    ctx.save();
+    ctx.fillStyle = 'rgba(80,120,170,0.35)';
+    ctx.strokeStyle = COL.probe;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.rect(X(xp - hw * 0.7), Z(-h), X(xp + hw * 0.7) - X(xp - hw * 0.7), Z(0) - Z(-h));
+    ctx.fill();
+    ctx.stroke();
+    // kristal di dasar probe
+    ctx.fillStyle = COL.probe;
+    const cr = o.state.crystal / 2;
+    ctx.fillRect(X(xp - cr), Z(-2.5), X(xp + cr) - X(xp - cr), Z(0) - Z(-2.5) - 1);
+    // kabel
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(X(xp), Z(-h));
+    ctx.quadraticCurveTo(X(xp), Z(-h - 6), X(xp + 8), Z(-h - 8));
+    ctx.stroke();
+    ctx.fillStyle = COL.text;
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`0° · ${o.state.freq} MHz (probe lurus)`, X(xp), Z(-h - 9) - 6);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = COL.muted;
+    ctx.fillText(`posisi: ${xp.toFixed(1)} mm`, X(xp), Z(-h - 9) + 8);
+    ctx.restore();
+  }
+
   function drawProbe(ctx, o, X, Z) {
+    if (Math.abs(o.H.angle) < 1) { drawStraightProbe(ctx, o, X, Z); return; }
     const wd = UT.CONFIG.wedge;
     const d = o.dir;
     const { xf, xb } = UT.probeExtent(o.state.probeX, d, o.H);

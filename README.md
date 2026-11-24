@@ -9,7 +9,21 @@ Buka `index.html` di browser (Chrome, Edge, Firefox). Tidak perlu server maupun 
 
 Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from branch, lalu pilih folder root.
 
+**Tanpa internet (offline):** bila dibuka lewat `http(s)` (mis. GitHub Pages atau `python3 -m http.server`), aplikasi
+menyimpan semua berkasnya di perangkat. Setelah sekali dibuka, simulator tetap berjalan tanpa internet dan bisa
+dipasang sebagai aplikasi ("Install app" / "Tambahkan ke layar utama"). Saat membuka `index.html` langsung dari
+berkas (`file://`) aplikasi juga jalan, tetapi tanpa fitur pasang/offline otomatis.
+
 ## Fitur
+
+### v0.7 – Probe lurus 0°, laminasi, rencana scan, mode offline
+- **Probe lurus 0°** (gelombang longitudinal): echo back wall T, 2T, 3T…, pengukuran tebal, kalibrasi cukup zero & velocity.
+- **Laminasi di logam induk**: echo berulang sebelum back wall dan back wall hilang. Laminasi juga **membayangi berkas
+  probe sudut** (skenario “Laminasi + LOF”: LOF hampir hilang dari sisi kiri, jelas dari sisi kanan).
+- **Rencana scan & cakupan**: pilih sudut (45/60/70°), sisi, leg, jarak gerak probe, dan lebar HAZ; penampang menampilkan
+  daerah yang dilalui berkas −6 dB (hijau = 1 setup, biru = ≥ 2 setup, merah = tidak tercakup) beserta persentase cakupan.
+- **Mode offline (PWA)**: service worker + manifest, bisa dipasang di HP/laptop.
+- **Tutorial 10–11**: probe lurus & laminasi; rencana scan & cakupan.
 
 ### v0.6 – Cacat melintang, scan sejajar las, TCG, tutorial lanjutan
 - **Cacat baru**: retak melintang (tegak lurus sumbu las), undercut, dan retak kaki las (toe crack). Ketiganya juga muncul di soal ujian acak.
@@ -131,6 +145,8 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 | Permukaan lengkung | Rugi kopling ≈ 10 dB per mm celah tepi wedge datar (maks. 18 dB); berkas melebar searah keliling |
 | Waktu alat | t = 2·SP/v + zero (wedge). Pembacaan alat memakai velocity dan zero yang dimasukkan pengguna |
 | Phased Array | Setiap sudut sektor disimulasikan sebagai berkas dengan aperture array (9,6 mm) dari exit point yang sama. Fokus elektronik belum dimodelkan |
+| Probe lurus & laminasi | Back wall sebagai pemantul datar di T, 2T, …; laminasi = reflektor datar dua sisi dengan echo ulang, dan daerah bayangan yang melemahkan berkas yang melewatinya |
+| Cakupan scan | Geometris: titik zona tercakup bila berada dalam lebar berkas −6 dB untuk salah satu posisi probe di rentang jarak yang dipilih (leg 1/2) |
 | TOFD | Pitch-catch gelombang longitudinal (5920 m/s). Back wall dan cacat dijumlahkan sebagai titik hambur Huygens, sehingga difraksi ujung dan fasenya muncul dari interferensi. Lateral wave = fraksi tetap dari back wall |
 
 Model ini disederhanakan untuk edukasi (2D, tanpa konversi mode penuh, tanpa pembelokan berkas akibat anisotropi las austenitik, tanpa fokus elektronik pada Phased Array). Faktor material dan rugi kopling bersifat kualitatif. Nilai amplitudonya bersifat kualitatif dan tidak menggantikan latihan dengan alat dan spesimen nyata.
@@ -148,6 +164,7 @@ src/specimens.js        benda uji: las/pipa, blok IIW V1 (sisi A/B), blok V2, bl
 src/calibration.js      kebenaran probe tersembunyi, pemetaan zero/velocity, X-value
 src/dac.js              DAC, reference level, evaluasi ASME App. 12
 src/exam.js             soal acak, DAC otomatis, penilaian ujian
+src/scanplan.js         rencana scan: peta cakupan zona las + HAZ, jarak skip
 src/imaging.js          B-scan, S-scan Phased Array, simulasi TOFD, akuisisi progresif
 src/render-images.js    gambar B-scan/D-scan dan sektor S-scan
 src/report.js           laporan inspeksi HTML (cetak/PDF/unduh)
@@ -160,6 +177,9 @@ src/render-ascan.js     gambar layar A-scan
 src/main.js             state, kontrol UI, interaksi, loop render
 tests/run.js            unit test geometri, fisika, kalibrasi, DAC, ujian, laporan
 docs/ROADMAP.md         rencana pengembangan
+manifest.webmanifest    data aplikasi terpasang (PWA)
+sw.js                   service worker: cache berkas untuk mode offline (ganti nama cache tiap rilis)
+icons/                  ikon aplikasi
 ```
 
 ## Test

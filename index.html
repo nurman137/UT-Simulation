@@ -5,13 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Simulator UT Las</title>
   <meta name="description" content="Simulator Ultrasonic Testing (UT) probe sudut untuk inspeksi las – media edukasi NDT.">
+  <meta name="theme-color" content="#1f2933">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.6 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.7 · acuan ASME Sec. V Art. 4</span>
     </div>
     <span class="btnrow topbtns">
       <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
@@ -26,11 +30,11 @@
         <p class="small">Simulator edukasi Ultrasonic Testing untuk inspeksi las, berjalan sepenuhnya di browser tanpa server. Semua data (laporan, rekap kelas) hanya tersimpan di perangkat pengguna.</p>
         <h3>Cakupan</h3>
         <ul class="small notes">
-          <li>UT konvensional probe sudut (A-scan, B-scan), Phased Array S-scan, TOFD.</li>
+          <li>UT konvensional probe sudut dan probe lurus 0° (A-scan, B-scan), Phased Array S-scan, TOFD.</li>
           <li>Las pelat (bevel V, X, U) dan pipa (las girth); baja karbon dan austenitik; gelombang geser & longitudinal.</li>
           <li>Kalibrasi dengan blok IIW V1 (dua sisi), V2 (sisi atas & miring), dan blok kalibrasi dasar ASME (DAC/TCG).</li>
-          <li>Scan tegak lurus dan sejajar las; 12 jenis skenario cacat + cacat acak.</li>
-          <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12, tutorial 9 pelajaran, ujian & rekap kelas.</li>
+          <li>Scan tegak lurus dan sejajar las; 14 jenis skenario cacat (termasuk laminasi logam induk) + cacat acak; rencana scan & peta cakupan.</li>
+          <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12, tutorial 11 pelajaran, ujian & rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s).</li>
         </ul>
       </div>
       <div>
@@ -353,6 +357,34 @@
       </div>
     </fieldset>
 
+    <fieldset class="card wide" id="planCard">
+      <legend>Rencana scan &amp; cakupan</legend>
+      <label class="check"><input id="inPlanOn" type="checkbox"> Tampilkan cakupan di penampang</label>
+      <div class="planrow">
+        <span class="small">Sudut:</span>
+        <label class="check"><input type="checkbox" data-plan-angle="45"> 45°</label>
+        <label class="check"><input type="checkbox" data-plan-angle="60"> 60°</label>
+        <label class="check"><input type="checkbox" data-plan-angle="70"> 70°</label>
+      </div>
+      <div class="planrow">
+        <label>Sisi probe
+          <select id="inPlanSides">
+            <option value="kiri">Kiri saja</option>
+            <option value="kanan">Kanan saja</option>
+            <option value="keduanya">Kedua sisi</option>
+          </select>
+        </label>
+        <label>Leg
+          <select id="inPlanLegs"><option value="1">Leg 1 saja</option><option value="2">Leg 1–2</option></select>
+        </label>
+        <label>Jarak exit point min (mm)<input id="inPlanNear" type="number" min="0" max="300" step="1"></label>
+        <label>Jarak maks (mm)<input id="inPlanFar" type="number" min="5" max="400" step="1"></label>
+        <label>Zona HAZ (mm)<input id="inPlanHaz" type="number" min="0" max="25" step="1"></label>
+      </div>
+      <p id="planOut" class="small"></p>
+      <p class="muted small">Zona pemeriksaan = logam las + HAZ (sesuaikan dengan prosedur). Warna: <span class="cov1">■</span> tercakup 1 setup, <span class="cov2">■</span> ≥ 2 setup, <span class="cov0">■</span> tidak tercakup. Cakupan geometris belum menjamin deteksi: cacat planar perlu berkas yang mengenainya cukup tegak lurus, jadi scan dari dua sisi tetap dianjurkan.</p>
+    </fieldset>
+
     <fieldset class="card wide">
       <legend>Cacat &amp; tampilan</legend>
       <label id="scenarioLabel">Skenario cacat
@@ -387,7 +419,7 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.6 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.7 · ray tracing 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
@@ -398,6 +430,7 @@
   <script src="src/dac.js"></script>
   <script src="src/exam.js"></script>
   <script src="src/imaging.js"></script>
+  <script src="src/scanplan.js"></script>
   <script src="src/report.js"></script>
   <script src="src/rekap.js"></script>
   <script src="src/render-section.js"></script>
@@ -407,5 +440,11 @@
   <script src="src/main.js"></script>
   <script src="src/tutorial.js"></script>
   <script src="src/edu.js"></script>
+  <script>
+    // mode offline: daftarkan service worker bila dibuka lewat http(s) (bukan file://)
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
 </body>
 </html>

@@ -17,7 +17,7 @@
 
   UT.PROBE_BODY = 32; // panjang wedge (mm) dari muka depan ke belakang
   UT.V_WEDGE = 2730; // kecepatan longitudinal perspex (m/s)
-  const WEDGE_PATH = { 45: 12, 60: 15, 70: 18 }; // panjang lintasan di wedge (mm)
+  const WEDGE_PATH = { 0: 1, 45: 12, 60: 15, 70: 18 }; // panjang lintasan di wedge (mm); 0° = pelat aus tipis
 
   /** Zero nominal (µs, pulang-pergi di wedge) untuk sudut probe. */
   UT.nominalZero = function (angle) {
@@ -27,10 +27,15 @@
 
   /** Buat kebenaran probe. random = fungsi acak [0,1) atau null untuk probe ideal. */
   UT.makeProbeTruth = function (angle, random) {
-    const front = UT.CONFIG.wedge.front;
+    // Probe lurus 0°: exit point di tengah badan probe
+    const front = angle === 0 ? UT.PROBE_BODY / 2 : UT.CONFIG.wedge.front;
     const zero = UT.nominalZero(angle);
     if (!random) return { front, angle, zero };
     const sym = () => random() * 2 - 1;
+    if (angle === 0) {
+      // probe lurus: sudut & exit point tetap, hanya zero (pelat aus/delay) yang tidak diketahui
+      return { front, angle: 0, zero: Math.round((zero + random() * 0.8) * 100) / 100 };
+    }
     return {
       front: Math.round((front + sym() * 2.5) * 10) / 10,
       angle: Math.round((angle + sym() * 2.2) * 10) / 10,
@@ -62,6 +67,14 @@
 
   /** Apakah nilai alat sudah cocok dengan kebenaran probe (dalam toleransi praktis). */
   UT.calibrationStatus = function (H, user, vTrue) {
+    if (H.angle === 0) {
+      // probe lurus: hanya zero & velocity yang perlu dikalibrasi (dari echo back wall)
+      const items0 = [
+        { key: 'zero', ok: Math.abs(user.zero - H.zero) * (vTrue / 2000) <= 0.6 },
+        { key: 'velocity', ok: Math.abs(user.velocity - vTrue) / vTrue <= 0.01 },
+      ];
+      return { ok: items0.every((i) => i.ok), items: items0 };
+    }
     const items = [
       { key: 'X-value', ok: Math.abs(user.xValue - H.front) <= 1.0 },
       { key: 'sudut', ok: Math.abs(user.angle - H.angle) <= 1.5 }, // pembacaan skala blok ±1,5° (toleransi cek sudut umumnya ±2°)

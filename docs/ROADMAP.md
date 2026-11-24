@@ -60,6 +60,14 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Tutorial 5–9 (V2, TOFD, Phased Array, pipa & austenitik, scan sejajar)
 - [x] Panel Tentang (model & batasan), siap rilis di GitHub Pages
 
+## v0.7 – Probe lurus, laminasi, rencana scan, offline ✅
+- [x] Probe lurus 0° (LW): back wall berulang, ukur tebal, kalibrasi zero/velocity
+- [x] Laminasi di logam induk + bayangan berkas probe sudut
+- [x] Rencana scan & peta cakupan zona las + HAZ (sudut, sisi, leg, jarak gerak probe)
+- [x] Mode offline / dapat dipasang (PWA)
+- [x] Tutorial 10–11
+- [ ] Probe dual-element (TR) 0° — ditunda
+
 ## v1.0
 - [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III
 - [ ] Rilis di GitHub Pages
