@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulator UT Las</title>
+  <meta name="description" content="Simulator Ultrasonic Testing (UT) probe sudut untuk inspeksi las – media edukasi NDT.">
+  <meta name="theme-color" content="#1f2933">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong>Simulator UT Las</strong>
+      <span class="ver">v0.7 · acuan ASME Sec. V Art. 4</span>
+    </div>
+    <span class="btnrow topbtns">
+      <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
+      <button id="btnAbout" class="btn" type="button" aria-expanded="false" aria-controls="about">Tentang</button>
+    </span>
+  </header>
+
+  <section id="about" class="help" hidden>
+    <div class="help-cols">
+      <div>
+        <h3>Simulator UT Las <span id="aboutVer"></span></h3>
+        <p class="small">Simulator edukasi Ultrasonic Testing untuk inspeksi las, berjalan sepenuhnya di browser tanpa server. Semua data (laporan, rekap kelas) hanya tersimpan di perangkat pengguna.</p>
+        <h3>Cakupan</h3>
+        <ul class="small notes">
+          <li>UT konvensional probe sudut dan probe lurus 0° (A-scan, B-scan), Phased Array S-scan, TOFD.</li>
+          <li>Las pelat (bevel V, X, U) dan pipa (las girth); baja karbon dan austenitik; gelombang geser & longitudinal.</li>
+          <li>Kalibrasi dengan blok IIW V1 (dua sisi), V2 (sisi atas & miring), dan blok kalibrasi dasar ASME (DAC/TCG).</li>
+          <li>Scan tegak lurus dan sejajar las; 14 jenis skenario cacat (termasuk laminasi logam induk) + cacat acak; rencana scan & peta cakupan.</li>
+          <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12, tutorial 11 pelajaran, ujian & rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s).</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Model & batasan (penting untuk instruktur)</h3>
+        <ul class="small notes">
+          <li>Penampang 2D: lintasan sinar lurus dengan pantulan di permukaan; amplitudo dari penjumlahan koheren titik-titik permukaan cacat (Huygens/Kirchhoff), profil berkas Gaussian, atenuasi, dan penyebaran berkas.</li>
+          <li>Tidak dimodelkan: konversi mode penuh, pembelokan berkas akibat anisotropi las austenitik, fokus elektronik Phased Array, las memanjang (seam) pada pipa.</li>
+          <li>Nilai amplitudo bersifat kualitatif (proporsi antar-reflektor dibuat realistis, belum divalidasi terhadap alat tertentu). Faktor material dan rugi kopling permukaan lengkung juga kualitatif.</li>
+          <li>Dimensi blok V1/V2 diturunkan dari skala sudut pada blok fisik; blok kalibrasi ASME disederhanakan (tebal blok = tebal las).</li>
+          <li>Simulator ini <b>tidak menggantikan</b> latihan dengan alat dan spesimen nyata, dan laporan yang dihasilkan bukan dokumen inspeksi resmi.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="help" class="help" hidden>
+    <div class="help-cols">
+      <div>
+        <h3>Dasar</h3>
+        <ol>
+          <li><b>Geser probe</b> dengan mouse/jari pada penampang atau tampak atas, atau klik penampang lalu tekan <kbd>←</kbd> <kbd>→</kbd> (melintang las) dan <kbd>↑</kbd> <kbd>↓</kbd> (sepanjang las). Tahan <kbd>Shift</kbd> untuk langkah 5 mm.</li>
+          <li>Cari posisi probe yang memberi <b>amplitudo maksimum</b>, lalu atur <b>Gate A</b> agar melingkupi echo.</li>
+          <li>Arahkan kursor ke A-scan untuk melihat titik yang sesuai di sepanjang berkas.</li>
+          <li>Matikan “Tampilkan cacat” untuk berlatih tanpa melihat cacat.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Alur kalibrasi (tombol “Probe baru”)</h3>
+        <ol>
+          <li><b>Blok IIW V1 (atau V2) – probe index:</b> arahkan probe ke R100 (V2: R25/R50), cari echo maksimum, baca jarak depan probe ke tanda pusat → isi <b>X-value</b>.</li>
+          <li><b>Range/zero:</b> atur <b>zero</b> (dan velocity) sampai echo R100 tepat di 100 mm dan 200 mm. Pada V2: menghadap R25 → 25, 100, 175 mm; menghadap R50 → 50, 125, 200 mm.</li>
+          <li><b>Sudut:</b> balik probe ke arah lubang Ø50 (V1 sisi A; 70°–80° pakai Ø1,5 di sisi B; V2 pakai Ø5), cari echo maksimum, baca skala sudut pada tanda index → isi <b>sudut terukur</b>.</li>
+          <li><b>Blok ASME – DAC:</b> maksimalkan echo SDH ¼T, ½T, ¾T lalu lanjutkan lewat leg 2 (¾T → 5/4T, ½T → 6/4T, ¼T → 7/4T) agar DAC mencakup satu skip penuh. Rekam setiap titik tanpa mengubah gain. Lalu “Gain = reference” dan “Gain scanning +6 dB”.</li>
+          <li><b>Las:</b> scan, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, lihat hasil evaluasi ASME.</li>
+        </ol>
+        <h3>Teknik</h3>
+        <p class="small"><b>UT konvensional</b>: A-scan + rekam B-scan. <b>Phased Array</b>: S-scan 40–70°, klik sektor untuk memilih sudut A-scan. <b>TOFD</b>: D-scan sepanjang las; klik gambar untuk memasang penanda kedalaman A/B dan mengukur tinggi cacat.</p>
+        <h3>Pipa &amp; material</h3>
+        <p class="small">Pilih <b>Geometri: Pipa</b> untuk las girth (posisi jam). Wedge datar pada pipa kecil kehilangan banyak energi; centang <b>Wedge dikontur</b> dan buat DAC pada <b>blok lengkung</b>. Untuk <b>baja austenitik</b>, bandingkan gelombang geser (SW) dengan longitudinal (LW).</p>
+        <h3>Tutorial &amp; ujian</h3>
+        <p class="small">Pilih <b>Tutorial</b> untuk latihan terpandu, atau <b>Ujian</b> untuk soal acak dengan penilaian otomatis. Catat indikasi di kartu <b>Laporan indikasi</b>, lalu cetak atau unduh laporannya. Setelah ujian, unduh <b>file hasil</b>; instruktur mengimpornya di tab <b>Rekap kelas</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <nav class="modebar" aria-label="Aktivitas">
+    <span class="modebar-label">Aktivitas:</span>
+    <div class="tabs" role="tablist" id="actTabs">
+      <button type="button" class="tab" role="tab" data-act="bebas">Bebas</button>
+      <button type="button" class="tab" role="tab" data-act="tutorial">Tutorial</button>
+      <button type="button" class="tab" role="tab" data-act="ujian">Ujian</button>
+      <button type="button" class="tab" role="tab" data-act="rekap">Rekap kelas</button>
+    </div>
+  </nav>
+
+  <section id="eduPanel" class="edupanel" hidden aria-live="polite"></section>
+
+  <nav class="modebar" aria-label="Benda uji">
+    <span class="modebar-label">Benda uji:</span>
+    <div class="tabs" role="tablist" id="specTabs"></div>
+    <span id="calBadge" class="badge"></span>
+  </nav>
+  <nav class="modebar" aria-label="Teknik">
+    <span class="modebar-label">Teknik:</span>
+    <div class="tabs" role="tablist" id="techTabs">
+      <button type="button" class="tab" role="tab" data-tech="ut">UT konvensional</button>
+      <button type="button" class="tab" role="tab" data-tech="paut">Phased Array (S-scan)</button>
+      <button type="button" class="tab" role="tab" data-tech="tofd">TOFD</button>
+    </div>
+  </nav>
+
+  <main class="views">
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="sectionTitle">Tampilan scanning (penampang las)</h2>
+        <span id="skipInfo" class="muted small"></span>
+      </div>
+      <div class="canvas-wrap"><canvas id="cvSection" tabindex="0" aria-label="Penampang benda uji dan probe. Seret untuk menggeser probe."></canvas></div>
+      <div id="topWrap">
+        <div class="subhead small"><b>Tampak atas</b> <span class="muted">– seret untuk menggeser probe sepanjang las (skala y dipadatkan)</span></div>
+        <div class="canvas-wrap"><canvas id="cvTop" tabindex="0" aria-label="Tampak atas las. Seret untuk menggeser probe sepanjang las."></canvas></div>
+      </div>
+      <ul class="legend small">
+        <li><i class="sw sw-index"></i>Tanda index (X-value)</li>
+        <li><i class="sw sw-exit"></i>Exit point sebenarnya (mode guru)</li>
+        <li><i class="sw sw-beam"></i>Berkas −6 dB</li>
+        <li><i class="sw sw-gate"></i>Gate A (menurut alat)</li>
+        <li><i class="sw sw-peak"></i>Posisi echo menurut alat</li>
+        <li><i class="sw sw-cursor"></i>Kursor A-scan</li>
+        <li><i class="sw sw-defect"></i>Cacat (mode guru)</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>A-scan</h2>
+        <span id="satWarn" class="warn small" hidden>Saturasi &gt;100% FSH – turunkan gain</span>
+      </div>
+      <div id="imgBar" class="imgbar small"></div>
+      <div id="imgWrap" hidden>
+        <div class="canvas-wrap"><canvas id="cvImg" aria-label="Citra B-scan, S-scan, atau D-scan TOFD"></canvas></div>
+      </div>
+      <div class="canvas-wrap dark"><canvas id="cvAscan" aria-label="Layar A-scan"></canvas></div>
+      <div class="readouts" aria-live="polite">
+        <div><span id="roAmpL">Amplitudo</span><b id="roAmp">–</b></div>
+        <div><span id="roDacL">Terhadap DAC</span><b id="roDac">–</b></div>
+        <div><span id="roSPL">Sound path (SP)</span><b id="roSP">–</b></div>
+        <div><span id="roDepthL">Kedalaman</span><b id="roDepth">–</b></div>
+        <div><span id="roSDL">Jarak permukaan</span><b id="roSD">–</b></div>
+        <div><span id="roXLabel">Posisi thd sumbu las</span><b id="roX">–</b></div>
+        <div><span id="roLegL">Leg</span><b id="roLeg">–</b></div>
+        <div><span id="roPLabel">Posisi probe (y)</span><b id="roP">–</b></div>
+      </div>
+      <div id="evalBox" class="evalbox" hidden></div>
+    </section>
+  </main>
+
+  <section class="controls">
+    <fieldset class="card">
+      <legend>Benda uji</legend>
+      <label>Material
+        <select id="inMaterial"></select>
+      </label>
+      <label>Tebal pelat T (mm)
+        <select id="inT"></select>
+      </label>
+      <div id="weldOnly">
+        <label>Geometri
+          <select id="inGeom">
+            <option value="pelat">Pelat (las lurus)</option>
+            <option value="pipa">Pipa (las girth / keliling)</option>
+          </select>
+        </label>
+        <label>Jenis bevel
+          <select id="inBevelType"></select>
+        </label>
+        <label id="lblBevel">Sudut bevel (½ sudut)
+          <select id="inBevel"></select>
+        </label>
+        <label>Root gap (mm)
+          <input id="inGap" type="number" min="0" max="5" step="0.5">
+        </label>
+        <label class="check"><input id="inCap" type="checkbox"> Cap (reinforcement) ada</label>
+        <label class="check"><input id="inRoot" type="checkbox"> Root bead (penetrasi) ada</label>
+      </div>
+      <label id="lblFace">Sisi pemindaian blok
+        <select id="inFace">
+          <option value="A">Sisi A – R100, Ø50, skala 35°–76°</option>
+          <option value="B">Sisi B – Ø1,5, skala 70°–80°</option>
+        </select>
+      </label>
+      <label class="check" id="lblAsmeCurved"><input id="inAsmeCurved" type="checkbox"> Blok lengkung (diameter = OD pipa)</label>
+      <label id="lblOD">Diameter luar pipa OD
+        <select id="inOD"></select>
+      </label>
+      <p id="specInfo" class="muted small"></p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Probe</legend>
+      <label>Sudut nominal
+        <select id="inAngle"></select>
+      </label>
+      <label>Frekuensi
+        <select id="inFreq"></select>
+      </label>
+      <label>Ukuran kristal
+        <select id="inCrystal"></select>
+      </label>
+      <label>Mode gelombang
+        <select id="inWave">
+          <option value="T">Geser / shear (SW)</option>
+          <option value="L">Longitudinal (LW)</option>
+        </select>
+      </label>
+      <label>Arah scan
+        <select id="inOrient">
+          <option value="tegak">Tegak lurus las (cacat memanjang)</option>
+          <option value="sejajar">Sejajar las (cacat melintang)</option>
+        </select>
+      </label>
+      <label class="check" id="lblContour"><input id="inContour" type="checkbox"> Wedge dikontur sesuai diameter</label>
+      <div class="seg" role="group" aria-label="Arah probe">
+        <span>Arah berkas</span>
+        <button type="button" id="sideL" class="btn seg-btn">→ kanan</button>
+        <button type="button" id="sideR" class="btn seg-btn">← kiri</button>
+      </div>
+      <p id="probeInfo" class="muted small"></p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Flaw detector</legend>
+      <div class="gain">
+        <span>Gain</span>
+        <button type="button" class="btn" data-gain="-6">−6</button>
+        <button type="button" class="btn" data-gain="-0.5">−0.5</button>
+        <output id="gainOut">0 dB</output>
+        <button type="button" class="btn" data-gain="0.5">+0.5</button>
+        <button type="button" class="btn" data-gain="6">+6</button>
+      </div>
+      <input id="inGain" type="range" min="0" max="90" step="0.5" aria-label="Gain (dB)">
+      <button type="button" id="btnPeak80" class="btn full">Atur gain: puncak gate = 80%</button>
+      <label>Range (mm SP)
+        <input id="inRange" type="number" min="10" max="400" step="5">
+      </label>
+      <label>Delay tampilan (mm SP)
+        <input id="inDelay" type="number" min="-30" max="300" step="1">
+      </label>
+      <label>Tampilan sinyal
+        <select id="inRect">
+          <option value="full">Full wave (rektifikasi)</option>
+          <option value="rf">RF</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Gate A</legend>
+      <label>Awal (mm SP)
+        <input id="inGs" type="number" min="0" max="400" step="1">
+      </label>
+      <label>Lebar (mm SP)
+        <input id="inGw" type="number" min="1" max="400" step="1">
+      </label>
+      <label>Level (% FSH)
+        <input id="inGl" type="number" min="5" max="95" step="1">
+      </label>
+      <p class="muted small">Pembacaan muncul bila echo di dalam gate melewati level gate.</p>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>Kalibrasi probe &amp; alat</legend>
+      <label>X-value: depan probe → index (mm)
+        <input id="inXv" type="number" min="0" max="25" step="0.1">
+      </label>
+      <label>Sudut terukur (°)
+        <input id="inAngU" type="number" min="30" max="80" step="0.1">
+      </label>
+      <label>Zero / probe delay (µs)
+        <input id="inZero" type="number" min="0" max="30" step="0.01">
+      </label>
+      <label>Velocity (m/s)
+        <input id="inVel" type="number" min="2000" max="7000" step="10">
+      </label>
+      <div class="btnrow">
+        <button type="button" id="btnNewProbe" class="btn">Probe baru (belum dikalibrasi)</button>
+        <button type="button" id="btnAutoCal" class="btn">Isi nilai sebenarnya</button>
+      </div>
+      <ul id="calStatus" class="calstatus small"></ul>
+      <div id="blockHelp" class="blockhelp small"></div>
+    </fieldset>
+
+    <fieldset class="card">
+      <legend>DAC (ASME)</legend>
+      <p id="dacInfo" class="small"></p>
+      <div class="btnrow">
+        <button type="button" id="btnDacAdd" class="btn">Rekam titik (puncak gate)</button>
+        <button type="button" id="btnDacUndo" class="btn">Hapus terakhir</button>
+        <button type="button" id="btnDacClear" class="btn">Hapus semua</button>
+      </div>
+      <div class="btnrow">
+        <button type="button" id="btnGainRef" class="btn">Gain = reference</button>
+        <button type="button" id="btnGainScan" class="btn">Gain scanning (+6 dB)</button>
+      </div>
+      <label class="check"><input id="inShowDac" type="checkbox"> Tampilkan kurva DAC di A-scan</label>
+      <label class="check"><input id="inTcg" type="checkbox"> TCG (Time Corrected Gain)</label>
+      <p class="muted small">TCG menambah gain menurut jarak sesuai DAC: SDH referensi di kedalaman mana pun tampil 80% pada reference level, sehingga kurva DAC menjadi garis datar.</p>
+      <ol id="dacList" class="daclist small"></ol>
+      <p id="dacWarn" class="warn small" hidden></p>
+      <p id="dacMsg" class="warn small" hidden></p>
+    </fieldset>
+
+    <fieldset class="card wide" id="sizingCard">
+      <legend>Sizing &amp; evaluasi (ASME Sec. VIII Div. 1 App. 12)</legend>
+      <div class="sizing">
+        <div>
+          <b class="small">Panjang – 6 dB drop</b>
+          <p class="muted small">Maksimalkan echo, tekan “puncak gate = 80%”, geser probe sepanjang las sampai echo turun ke 40%, lalu tandai. Ulangi ke arah sebaliknya.</p>
+          <div class="btnrow">
+            <button type="button" id="btnY1" class="btn">Tandai ujung 1</button>
+            <button type="button" id="btnY2" class="btn">Tandai ujung 2</button>
+          </div>
+          <p class="small">Panjang: <b id="outLen">–</b></p>
+        </div>
+        <div>
+          <b class="small">Tinggi – 6 dB drop</b>
+          <p class="muted small">Geser probe maju/mundur dari posisi maksimum sampai echo turun 6 dB, tandai kedalaman tepi atas dan bawah.</p>
+          <div class="btnrow">
+            <button type="button" id="btnD1" class="btn">Tandai tepi atas</button>
+            <button type="button" id="btnD2" class="btn">Tandai tepi bawah</button>
+          </div>
+          <p class="small">Tinggi: <b id="outHeight">–</b></p>
+        </div>
+        <div>
+          <label>Interpretasi indikasi
+            <select id="inIndType"></select>
+          </label>
+          <button type="button" id="btnSizeReset" class="btn">Reset sizing</button>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="card full" id="reportCard">
+      <legend>Laporan indikasi</legend>
+      <div class="reporthead">
+        <label>Nama pemeriksa <input id="inStudent" type="text" maxlength="60" placeholder="nama siswa"></label>
+        <div class="btnrow">
+          <button type="button" id="btnRepAdd" class="btn">+ Tambah dari pembacaan saat ini</button>
+          <button type="button" id="btnRepBlank" class="btn">+ Baris kosong</button>
+          <button type="button" id="btnRepPrint" class="btn">Cetak / simpan PDF</button>
+          <button type="button" id="btnRepDownload" class="btn">Unduh laporan (.html)</button>
+        </div>
+      </div>
+      <p class="muted small">“Tambah dari pembacaan” mengambil ujung-ujung hasil sizing (atau posisi probe), kedalaman, posisi, dan %DAC dari puncak gate, serta interpretasi yang dipilih. Semua kolom bisa diedit.</p>
+      <div class="tablewrap">
+        <table class="reptable">
+          <thead><tr><th>#</th><th>y awal</th><th>y akhir</th><th>Panjang</th><th>Kedalaman</th><th>Posisi x</th><th>%DAC</th><th>Interpretasi</th><th>Keputusan</th><th>Catatan</th><th></th></tr></thead>
+          <tbody id="repBody"></tbody>
+        </table>
+      </div>
+    </fieldset>
+
+    <fieldset class="card wide" id="planCard">
+      <legend>Rencana scan &amp; cakupan</legend>
+      <label class="check"><input id="inPlanOn" type="checkbox"> Tampilkan cakupan di penampang</label>
+      <div class="planrow">
+        <span class="small">Sudut:</span>
+        <label class="check"><input type="checkbox" data-plan-angle="45"> 45°</label>
+        <label class="check"><input type="checkbox" data-plan-angle="60"> 60°</label>
+        <label class="check"><input type="checkbox" data-plan-angle="70"> 70°</label>
+      </div>
+      <div class="planrow">
+        <label>Sisi probe
+          <select id="inPlanSides">
+            <option value="kiri">Kiri saja</option>
+            <option value="kanan">Kanan saja</option>
+            <option value="keduanya">Kedua sisi</option>
+          </select>
+        </label>
+        <label>Leg
+          <select id="inPlanLegs"><option value="1">Leg 1 saja</option><option value="2">Leg 1–2</option></select>
+        </label>
+        <label>Jarak exit point min (mm)<input id="inPlanNear" type="number" min="0" max="300" step="1"></label>
+        <label>Jarak maks (mm)<input id="inPlanFar" type="number" min="5" max="400" step="1"></label>
+        <label>Zona HAZ (mm)<input id="inPlanHaz" type="number" min="0" max="25" step="1"></label>
+      </div>
+      <p id="planOut" class="small"></p>
+      <p class="muted small">Zona pemeriksaan = logam las + HAZ (sesuaikan dengan prosedur). Warna: <span class="cov1">■</span> tercakup 1 setup, <span class="cov2">■</span> ≥ 2 setup, <span class="cov0">■</span> tidak tercakup. Cakupan geometris belum menjamin deteksi: cacat planar perlu berkas yang mengenainya cukup tegak lurus, jadi scan dari dua sisi tetap dianjurkan.</p>
+    </fieldset>
+
+    <fieldset class="card wide">
+      <legend>Cacat &amp; tampilan</legend>
+      <label id="scenarioLabel">Skenario cacat
+        <select id="inScenario"></select>
+      </label>
+      <div id="randRow" class="randrow">
+        <label>Kode soal <input id="inSeed" type="number" min="1" max="99999" step="1"></label>
+        <label>Jumlah cacat
+          <select id="inCount"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+        </label>
+        <button type="button" id="btnReroll" class="btn">Acak ulang</button>
+      </div>
+      <p id="scenarioDesc" class="desc"></p>
+      <label class="check"><input id="inShowDef" type="checkbox"> Tampilkan cacat &amp; exit point sebenarnya (mode guru)</label>
+      <label class="check"><input id="inShowBeam" type="checkbox"> Tampilkan berkas &amp; sinar</label>
+      <label class="check"><input id="inGrain" type="checkbox"> Noise butir material</label>
+    </fieldset>
+
+    <fieldset class="card wide">
+      <legend>Catatan ASME</legend>
+      <ul class="small notes">
+        <li>Frekuensi nominal probe untuk pemeriksaan las umumnya 1–5 MHz (ASME Sec. V Art. 4).</li>
+        <li>Blok kalibrasi dasar: SDH pada ¼T, ½T, ¾T. Diameter SDH mengikuti tebal (≤ 25 mm: 2,5 mm; 25–50 mm: 3 mm). Di simulator, tebal blok = tebal las.</li>
+        <li>Primary reference level: gain yang membuat titik DAC tertinggi berada di 80% FSH. Pemindaian dilakukan minimal 2× (+6 dB) di atas reference level.</li>
+        <li>Berkas sudut diarahkan kira-kira tegak lurus sumbu las, dari dua arah bila memungkinkan.</li>
+        <li>App. 12: indikasi &gt; 20% reference level diselidiki. Retak, lack of fusion, dan incomplete penetration tidak diterima berapa pun panjangnya. Indikasi lain ditolak bila melebihi reference level <i>dan</i> panjangnya &gt; 6 mm (t ≤ 19 mm), &gt; t/3 (19–57 mm), atau &gt; 19 mm (t &gt; 57 mm).</li>
+        <li>Permukaan lengkung: untuk diameter ≤ 20 in (≈ 508 mm) dipakai blok kalibrasi lengkung; satu blok berdiameter D berlaku untuk permukaan 0,9–1,5 × D.</li>
+        <li>Las austenitik: butir kolumnar kasar di logam las menyebabkan noise dan atenuasi tinggi, terutama untuk gelombang geser; probe gelombang longitudinal (LW) umumnya lebih sesuai.</li>
+        <li>Koreksi transfer (perbedaan kekasaran permukaan/atenuasi blok vs benda uji) belum dimodelkan, kecuali rugi kopling pada permukaan lengkung.</li>
+      </ul>
+      <p class="muted small">Model fisika disederhanakan untuk keperluan edukasi dan tidak menggantikan latihan dengan alat serta spesimen nyata. Dimensi blok IIW disederhanakan.</p>
+    </fieldset>
+  </section>
+
+  <footer class="foot muted small">Simulator UT Las v0.7 · ray tracing 2D + model amplitudo semi-analitik</footer>
+
+  <script src="src/config.js"></script>
+  <script src="src/geometry.js"></script>
+  <script src="src/defects.js"></script>
+  <script src="src/physics.js"></script>
+  <script src="src/specimens.js"></script>
+  <script src="src/calibration.js"></script>
+  <script src="src/dac.js"></script>
+  <script src="src/exam.js"></script>
+  <script src="src/imaging.js"></script>
+  <script src="src/scanplan.js"></script>
+  <script src="src/report.js"></script>
+  <script src="src/rekap.js"></script>
+  <script src="src/render-section.js"></script>
+  <script src="src/render-topview.js"></script>
+  <script src="src/render-ascan.js"></script>
+  <script src="src/render-images.js"></script>
+  <script src="src/main.js"></script>
+  <script src="src/tutorial.js"></script>
+  <script src="src/edu.js"></script>
+  <script>
+    // mode offline: daftarkan service worker bila dibuka lewat http(s) (bukan file://)
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>
