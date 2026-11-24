@@ -13,7 +13,7 @@
     if (app.setTechnique) app.setTechnique('ut');
     if (app.setMaterial) { app.setMaterial('cs'); app.setWave('T'); }
     if (app.setOrient) app.setOrient('tegak');
-    Object.assign(S, { bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, tcg: false, iiwFace: 'A', v2Face: 'A' });
+    Object.assign(S, { bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, tcg: false, iiwFace: 'A', v2Face: 'A', code: 'asme', awsB: null });
     app.locks.truth = app.locks.scenario = app.locks.autoCal = false;
     Object.assign(S, {
       T: 20, bevelHalf: 30, rootGap: 2, rootFace: 1.5, cap: true, rootBead: true,
@@ -22,6 +22,9 @@
     }, o || {});
     S.probeX = null;
     S._prevAngle = S.angle;
+    S._angleBefore = null;
+    S.dual = false;
+    Object.assign(S, { seam: false, aniso: true, pautMode: 'S', pautFocus: 0, pautBeam: 24, pautEAngle: 60 });
     S.plan = Object.assign({}, UT.CONFIG.defaults.plan, { on: false });
   }
 
@@ -595,6 +598,188 @@
         {
           title: 'Selesai',
           text: 'Rencana scan yang baik memakai lebih dari satu sudut, dari dua sisi bila bisa, dengan jarak gerak probe minimal sampai leg 2 mencapai tepi zona seberang (≈ 1 skip + lebar las/2 + HAZ). Cakupan geometris adalah syarat perlu, bukan jaminan deteksi.',
+        },
+      ],
+    },
+    {
+      id: 'korosi',
+      title: '12. Pengukuran tebal & peta korosi (probe dual, C-scan)',
+      desc: 'Mengukur sisa tebal, membuat peta tebal C-scan, dan membandingkan probe tunggal dengan probe dual (TR).',
+      setup(app) {
+        baseSetup(app, { scenario: 'none', showDefects: false, angle: 0, wave: 'L', T: 16, gain: 32, velocity: UT.CONFIG.materials.cs.vL });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('korosi');
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Pelat terkorosi',
+          text: 'Pelat 16 mm ini terkorosi dari sisi bawah (sisi yang tidak bisa dijangkau): ada daerah dinding menipis dan beberapa pit kecil. Probe lurus mengukur sisa tebal dari SP echo back wall. Profil dasar disembunyikan; tugas Anda menemukannya.',
+        },
+        {
+          title: 'Peta tebal (C-scan)',
+          text: 'Klik “Rekam peta tebal (seluruh pelat)” di atas A-scan dan tunggu sampai selesai. Setiap titik peta = SP echo pertama di dalam Gate A.',
+          check: (app) => app.imgKind === 'cscan' && app.imgDone,
+        },
+        {
+          title: 'Periksa daerah tipis',
+          text: 'Klik daerah kuning/oranye/merah pada peta untuk memindahkan probe ke sana. Pastikan echo pertama masuk Gate A.',
+          hint: 'Warna biru = tebal nominal, merah = paling tipis. Abu-abu = tidak ada echo yang melewati level gate (permukaan miring atau pit kecil).',
+          check: (app, pk) => app.spec.thick(app.S.probeX, app.S.probeY) < 0.9 * app.spec.T && pk && pk.triggered,
+        },
+        {
+          title: 'Baca sisa tebal',
+          text: 'Berapa sisa tebal di posisi probe sekarang (SP echo pertama)?',
+          quiz: { label: 'Sisa tebal', unit: 'mm', check: (v, app) => Math.abs(v - app.spec.thick(app.S.probeX, app.S.probeY)) <= 0.7 },
+        },
+        {
+          title: 'Probe dual (TR)',
+          text: 'Probe tunggal punya dead zone panjang dan berkas lebar, sehingga pit kecil mudah terlewat. Ganti “Jenis probe 0°” menjadi Dual (TR), lalu ubah Gate A: awal 1,5 mm.',
+          check: (app) => app.S.dual && app.S.gateStart <= 3,
+        },
+        {
+          title: 'Bandingkan peta',
+          text: 'Rekam ulang peta tebal dengan probe dual. Pit yang tadinya abu-abu kini lebih mungkin terukur; tebal minimum biasanya lebih kecil. Ingat galat lintasan-V probe dual: pada dinding tipis tebal terbaca sedikit lebih besar.',
+          check: (app) => app.S.dual && app.imgKind === 'cscan' && app.imgDone,
+        },
+        {
+          title: 'Selesai',
+          text: 'Pengukuran korosi: petakan dulu seluruh area (C-scan atau grid), lalu periksa detail daerah tipis. Probe dual dipilih untuk dinding tipis dan pit karena dead zone pendek dan sensitif di dekat permukaan. Kalibrasi zero/velocity dilakukan pada step block yang tebalnya mendekati tebal yang diukur.',
+        },
+      ],
+    },
+    {
+      id: 'pautlanjut',
+      title: '13. Phased Array: fokus, delay law & E-scan',
+      desc: 'Pengaruh fokus elektronik pada lebar berkas dan amplitudo, serta scan linear (E-scan).',
+      setup(app) {
+        baseSetup(app, { scenario: 'porositas', showDefects: true, angle: 60 });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('las');
+        app.setTechnique('paut');
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Delay law',
+          text: 'Phased Array membelokkan berkas dengan menunda tembakan tiap elemen. Grafik batang ungu di atas S-scan adalah delay law aperture aktif: tanpa fokus waktunya naik lurus (muka gelombang datar dan miring).',
+        },
+        {
+          title: 'Fokus',
+          text: 'Pilih Fokus (kedalaman) 10 mm. Delay law menjadi melengkung, berkas di penampang menyempit di sekitar kedalaman fokus dan echo di dekatnya lebih tinggi.',
+          check: (app) => app.S.pautFocus === 10,
+        },
+        {
+          title: 'Batas near field',
+          text: 'Pilih fokus 40 mm. Fokus hanya bisa dibuat di dalam near field aperture; di luar itu berkas berperilaku seperti tanpa fokus (lihat keterangan di samping pilihan fokus).',
+          check: (app) => app.S.pautFocus === 40,
+        },
+        {
+          title: 'E-scan',
+          text: 'Tekan tombol E-scan. Sekarang 16 dari 64 elemen aktif digeser satu per satu pada sudut tetap, sehingga probe “memindai” tanpa digerakkan. Gambar E-scan = deretan A-scan dari 49 posisi berkas.',
+          check: (app) => app.S.pautMode === 'E',
+        },
+        {
+          title: 'Pilih berkas',
+          text: 'Klik gambar E-scan (atau geser slider Berkas) untuk memilih berkas yang memberi echo porositas ≥ 30% FSH.',
+          hint: 'Atur gain dan Gate A bila perlu; geser probe bila porositas berada di luar jangkauan E-scan.',
+          check: (app, pk) => app.S.pautMode === 'E' && pk && pk.triggered && pk.amp >= 30,
+        },
+        {
+          title: 'Selesai',
+          text: 'S-scan menyapu sudut dari satu posisi; E-scan menggeser aperture pada satu sudut. Fokus mempersempit berkas dan menaikkan amplitudo di sekitar kedalaman fokus, tetapi hanya di dalam near field.',
+        },
+      ],
+    },
+    {
+      id: 'seam',
+      title: '14. Las memanjang pipa & las austenitik anisotropik',
+      desc: 'Berkas di dinding pipa yang lengkung, sudut maksimum, dan pembelokan berkas di logam las austenitik.',
+      setup(app) {
+        baseSetup(app, { scenario: 'root-crack', showDefects: true, angle: 60 });
+        Object.assign(app.S, { geom: 'pipa', OD: 219.1, seam: true });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('las');
+        Object.assign(app.S, { gateStart: 15, gateWidth: 60 });
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Penampang keliling',
+          text: 'Las memanjang (seam) sejajar sumbu pipa, jadi berkas berjalan di bidang keliling: dinding luar dan dalam berupa busur. Lihat berkas 60°: berkas tidak mengenai dinding dalam dan memantul kembali ke permukaan luar.',
+        },
+        {
+          title: 'Sudut maksimum',
+          text: 'Berkas hanya mengenai dinding dalam bila sin θ ≤ Ri/Ro (lihat keterangan di atas penampang). Ganti sudut probe menjadi 45°.',
+          check: (app) => app.S.angle === 45,
+        },
+        {
+          title: 'Retak akar',
+          text: 'Wedge datar yang digeser searah keliling kehilangan banyak energi; centang “Wedge dikontur sesuai diameter”. Lalu temukan echo retak akar ≥ 50% FSH. Perhatikan bahwa jarak skip pada pipa lebih panjang daripada pelat datar; alat dengan koreksi lengkung tetap menunjukkan kedalaman yang benar.',
+          check: (app, pk) => pk && pk.triggered && pk.amp >= 50,
+        },
+        {
+          title: 'Las austenitik',
+          text: 'Kembali ke pelat: pilih Geometri “Pelat”, Material “Baja tahan karat austenitik”, dan pastikan “Anisotropi logam las” dicentang.',
+          check: (app) => app.S.geom === 'pelat' && app.S.material === 'ss' && app.S.aniso,
+        },
+        {
+          title: 'Pembelokan berkas',
+          text: 'Geser probe sampai berkas melewati logam las. Garis biru = lintasan sebenarnya yang berbelok mengikuti butir kolumnar; garis putus-putus = lintasan yang diasumsikan alat. Akibatnya posisi indikasi menurut alat bisa meleset dan sebagian volume tidak terjangkau.',
+        },
+        {
+          title: 'Selesai',
+          text: 'Pada las memanjang pipa pilih sudut sesuai t/D dan gunakan koreksi lengkung. Pada las austenitik, berkas longitudinal (LW) lebih sedikit berbelok dan teredam dibanding gelombang geser; prosedur khusus dan blok referensi dari bahan yang sama diperlukan.',
+        },
+      ],
+    },
+    {
+      id: 'aws',
+      title: '15. Evaluasi AWS D1.1 (rating indikasi)',
+      desc: 'Reference level dari lubang Ø1,5 mm blok IIW, faktor atenuasi, rating d = a − b − c, dan kelas A–D.',
+      setup(app) {
+        baseSetup(app, { scenario: 'lof-kiri', showDefects: true, angle: 70, T: 20 });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('las');
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Rating indikasi',
+          text: 'AWS D1.1 tidak memakai DAC. Setiap indikasi diberi rating d = a − b − c: a = gain saat echo indikasi tepat di garis referensi, b = gain saat echo lubang Ø1,5 mm blok IIW tepat di garis yang sama, c = 2 dB per inci SP setelah inci pertama. Kelas A–D ditentukan dari tabel menurut tebal dan sudut probe.',
+        },
+        {
+          title: 'Pilih acuan',
+          text: 'Pada kartu Sizing & evaluasi, pilih Acuan evaluasi “AWS D1.1”.',
+          check: (app) => app.S.code === 'aws',
+        },
+        {
+          title: 'Reference level b',
+          text: 'Buka Blok IIW V1, pilih sisi B dan Arah berkas “← kiri”, lalu cari echo maksimum lubang Ø1,5 mm. Atur Gate A agar mencakup echo itu, lalu tekan “Rekam b”.',
+          hint: 'Untuk 70° lubang Ø1,5 (15 mm dari sisi B) berada di SP ≈ 44 mm.',
+          check: (app) => app.S.awsB != null,
+        },
+        {
+          title: 'Indikasi di las',
+          text: 'Kembali ke Las (benda uji), cari echo LOF ≥ 50% FSH dengan Gate A melingkupinya.',
+          check: (app, pk) => app.spec.type === 'las' && pk && pk.triggered && pk.amp >= 50,
+        },
+        {
+          title: 'Rating',
+          text: 'Baca rating d pada pembacaan “Rating AWS (d)”.',
+          quiz: { label: 'Rating d', unit: 'dB', check: (v, app) => app.aws && app.aws.d != null && Math.abs(v - app.aws.d) <= 1 },
+        },
+        {
+          title: 'Selesai',
+          text: 'Kelas A ditolak; kelas B dan C ditolak bila panjangnya melebihi batas; kelas D diterima. Tabel di simulator disusun untuk edukasi – selalu gunakan tabel dari edisi AWS D1.1 yang berlaku.',
         },
       ],
     },

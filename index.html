@@ -15,11 +15,12 @@
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.7 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.8 · acuan ASME Sec. V Art. 4</span>
     </div>
     <span class="btnrow topbtns">
       <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
       <button id="btnAbout" class="btn" type="button" aria-expanded="false" aria-controls="about">Tentang</button>
+      <button id="btnLang" class="btn" type="button" title="Bahasa / Language">EN</button>
     </span>
   </header>
 
@@ -30,18 +31,20 @@
         <p class="small">Simulator edukasi Ultrasonic Testing untuk inspeksi las, berjalan sepenuhnya di browser tanpa server. Semua data (laporan, rekap kelas) hanya tersimpan di perangkat pengguna.</p>
         <h3>Cakupan</h3>
         <ul class="small notes">
-          <li>UT konvensional probe sudut dan probe lurus 0° (A-scan, B-scan), Phased Array S-scan, TOFD.</li>
-          <li>Las pelat (bevel V, X, U) dan pipa (las girth); baja karbon dan austenitik; gelombang geser & longitudinal.</li>
+          <li>UT konvensional probe sudut, probe lurus 0° tunggal &amp; dual (A-scan, B-scan, C-scan peta tebal), Phased Array S-scan &amp; E-scan dengan fokus, TOFD.</li>
+          <li>Las pelat (bevel V, X, U), pipa (las girth &amp; memanjang), pelat korosi; baja karbon dan austenitik (dengan pembelokan berkas); gelombang geser &amp; longitudinal.</li>
           <li>Kalibrasi dengan blok IIW V1 (dua sisi), V2 (sisi atas & miring), dan blok kalibrasi dasar ASME (DAC/TCG).</li>
           <li>Scan tegak lurus dan sejajar las; 14 jenis skenario cacat (termasuk laminasi logam induk) + cacat acak; rencana scan & peta cakupan.</li>
-          <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12, tutorial 11 pelajaran, ujian & rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s).</li>
+          <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12 atau AWS D1.1, tutorial 15 pelajaran, ujian (termasuk ujian praktik lengkap) &amp; rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s). Tampilan bahasa Indonesia atau Inggris.</li>
         </ul>
       </div>
       <div>
         <h3>Model & batasan (penting untuk instruktur)</h3>
         <ul class="small notes">
-          <li>Penampang 2D: lintasan sinar lurus dengan pantulan di permukaan; amplitudo dari penjumlahan koheren titik-titik permukaan cacat (Huygens/Kirchhoff), profil berkas Gaussian, atenuasi, dan penyebaran berkas.</li>
-          <li>Tidak dimodelkan: konversi mode penuh, pembelokan berkas akibat anisotropi las austenitik, fokus elektronik Phased Array, las memanjang (seam) pada pipa.</li>
+          <li>Penampang 2D: lintasan sinar dengan pantulan di permukaan datar atau lengkung; amplitudo dari penjumlahan koheren titik-titik permukaan cacat (Huygens/Kirchhoff), profil berkas Gaussian, atenuasi, dan penyebaran berkas.</li>
+          <li>Anisotropi las austenitik dimodelkan sederhana (arah energi berbelok mengikuti orientasi butir kolumnar). Fokus Phased Array hanya di bidang aktif; delay law dihitung untuk kontak langsung tanpa wedge.</li>
+          <li>Tidak dimodelkan: konversi mode penuh, pemisahan berkas (beam splitting) di las austenitik, kekasaran permukaan korosi selain kemiringan.</li>
+          <li>Tabel kelas AWS D1.1 disusun untuk edukasi; cocokkan dengan edisi standar yang berlaku sebelum dipakai.</li>
           <li>Nilai amplitudo bersifat kualitatif (proporsi antar-reflektor dibuat realistis, belum divalidasi terhadap alat tertentu). Faktor material dan rugi kopling permukaan lengkung juga kualitatif.</li>
           <li>Dimensi blok V1/V2 diturunkan dari skala sudut pada blok fisik; blok kalibrasi ASME disederhanakan (tebal blok = tebal las).</li>
           <li>Simulator ini <b>tidak menggantikan</b> latihan dengan alat dan spesimen nyata, dan laporan yang dihasilkan bukan dokumen inspeksi resmi.</li>
@@ -71,9 +74,9 @@
           <li><b>Las:</b> scan, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, lihat hasil evaluasi ASME.</li>
         </ol>
         <h3>Teknik</h3>
-        <p class="small"><b>UT konvensional</b>: A-scan + rekam B-scan. <b>Phased Array</b>: S-scan 40–70°, klik sektor untuk memilih sudut A-scan. <b>TOFD</b>: D-scan sepanjang las; klik gambar untuk memasang penanda kedalaman A/B dan mengukur tinggi cacat.</p>
+        <p class="small"><b>UT konvensional</b>: A-scan + rekam B-scan; pada <b>Pelat korosi</b>: C-scan peta tebal. <b>Phased Array</b>: S-scan 40–70° atau E-scan, dengan pilihan fokus; klik gambar untuk memilih sudut/berkas A-scan. <b>TOFD</b>: D-scan sepanjang las; klik gambar untuk memasang penanda kedalaman A/B dan mengukur tinggi cacat.</p>
         <h3>Pipa &amp; material</h3>
-        <p class="small">Pilih <b>Geometri: Pipa</b> untuk las girth (posisi jam). Wedge datar pada pipa kecil kehilangan banyak energi; centang <b>Wedge dikontur</b> dan buat DAC pada <b>blok lengkung</b>. Untuk <b>baja austenitik</b>, bandingkan gelombang geser (SW) dengan longitudinal (LW).</p>
+        <p class="small">Pilih <b>Geometri: Pipa</b> lalu sambungan <b>girth</b> (posisi jam) atau <b>memanjang</b> (penampang keliling, sudut maksimum menurut t/D). Wedge datar pada pipa kecil kehilangan banyak energi; centang <b>Wedge dikontur</b> dan buat DAC pada <b>blok lengkung</b>. Untuk <b>baja austenitik</b>, bandingkan gelombang geser (SW) dengan longitudinal (LW) dan amati pembelokan berkas di logam las.</p>
         <h3>Tutorial &amp; ujian</h3>
         <p class="small">Pilih <b>Tutorial</b> untuk latihan terpandu, atau <b>Ujian</b> untuk soal acak dengan penilaian otomatis. Catat indikasi di kartu <b>Laporan indikasi</b>, lalu cetak atau unduh laporannya. Setelah ujian, unduh <b>file hasil</b>; instruktur mengimpornya di tab <b>Rekap kelas</b>.</p>
       </div>
@@ -158,6 +161,7 @@
       <label>Material
         <select id="inMaterial"></select>
       </label>
+      <label class="check" id="lblAniso" hidden><input id="inAniso" type="checkbox"> Anisotropi logam las (pembelokan berkas)</label>
       <label>Tebal pelat T (mm)
         <select id="inT"></select>
       </label>
@@ -165,8 +169,11 @@
         <label>Geometri
           <select id="inGeom">
             <option value="pelat">Pelat (las lurus)</option>
-            <option value="pipa">Pipa (las girth / keliling)</option>
+            <option value="pipa">Pipa</option>
           </select>
+        </label>
+        <label id="lblSeam" hidden>Sambungan pipa
+          <select id="inSeam"><option value="0">Girth (melingkar)</option><option value="1">Memanjang (seam)</option></select>
         </label>
         <label>Jenis bevel
           <select id="inBevelType"></select>
@@ -197,6 +204,9 @@
       <legend>Probe</legend>
       <label>Sudut nominal
         <select id="inAngle"></select>
+      </label>
+      <label id="lblDual" hidden>Jenis probe 0°
+        <select id="inDual"><option value="0">Tunggal (single)</option><option value="1">Dual (TR)</option></select>
       </label>
       <label>Frekuensi
         <select id="inFreq"></select>
@@ -288,7 +298,7 @@
     </fieldset>
 
     <fieldset class="card">
-      <legend>DAC (ASME)</legend>
+      <legend>DAC (ASME) · referensi AWS</legend>
       <p id="dacInfo" class="small"></p>
       <div class="btnrow">
         <button type="button" id="btnDacAdd" class="btn">Rekam titik (puncak gate)</button>
@@ -302,13 +312,19 @@
       <label class="check"><input id="inShowDac" type="checkbox"> Tampilkan kurva DAC di A-scan</label>
       <label class="check"><input id="inTcg" type="checkbox"> TCG (Time Corrected Gain)</label>
       <p class="muted small">TCG menambah gain menurut jarak sesuai DAC: SDH referensi di kedalaman mana pun tampil 80% pada reference level, sehingga kurva DAC menjadi garis datar.</p>
+      <div id="awsRef" class="awsref" hidden>
+        <b class="small">AWS D1.1 – reference level b</b>
+        <p class="muted small">Di <b>Blok IIW V1 sisi B</b>, maksimalkan echo lubang Ø1,5 mm, pastikan di dalam Gate A, lalu rekam. b = gain yang membuat echo itu tepat di garis referensi 50% FSH.</p>
+        <div class="btnrow"><button type="button" id="btnAwsB" class="btn">Rekam b (puncak gate)</button></div>
+        <p class="small">b = <b id="awsBOut">–</b></p>
+      </div>
       <ol id="dacList" class="daclist small"></ol>
       <p id="dacWarn" class="warn small" hidden></p>
       <p id="dacMsg" class="warn small" hidden></p>
     </fieldset>
 
     <fieldset class="card wide" id="sizingCard">
-      <legend>Sizing &amp; evaluasi (ASME Sec. VIII Div. 1 App. 12)</legend>
+      <legend>Sizing &amp; evaluasi</legend>
       <div class="sizing">
         <div>
           <b class="small">Panjang – 6 dB drop</b>
@@ -329,6 +345,12 @@
           <p class="small">Tinggi: <b id="outHeight">–</b></p>
         </div>
         <div>
+          <label>Acuan evaluasi
+            <select id="inCode">
+              <option value="asme">ASME Sec. VIII Div. 1 App. 12</option>
+              <option value="aws">AWS D1.1 (struktur, beban statis)</option>
+            </select>
+          </label>
           <label>Interpretasi indikasi
             <select id="inIndType"></select>
           </label>
@@ -419,18 +441,20 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.7 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.8 · lintasan berkas 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
   <script src="src/defects.js"></script>
   <script src="src/physics.js"></script>
+  <script src="src/corrosion.js"></script>
   <script src="src/specimens.js"></script>
   <script src="src/calibration.js"></script>
   <script src="src/dac.js"></script>
   <script src="src/exam.js"></script>
   <script src="src/imaging.js"></script>
   <script src="src/scanplan.js"></script>
+  <script src="src/raypath.js"></script>
   <script src="src/report.js"></script>
   <script src="src/rekap.js"></script>
   <script src="src/render-section.js"></script>
@@ -440,6 +464,8 @@
   <script src="src/main.js"></script>
   <script src="src/tutorial.js"></script>
   <script src="src/edu.js"></script>
+  <script src="src/i18n-lessons-en.js"></script>
+  <script src="src/i18n.js"></script>
   <script>
     // mode offline: daftarkan service worker bila dibuka lewat http(s) (bukan file://)
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

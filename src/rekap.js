@@ -25,6 +25,19 @@
     }));
   }
 
+  /** Data proses ujian praktik (kalibrasi, DAC, gain) yang sudah dibersihkan, atau null. */
+  function cleanProcess(p) {
+    if (!p || typeof p !== 'object' || !p.H || !p.user) return null;
+    const n = (v, d) => (isFinite(+v) ? +v : d);
+    return {
+      H: { front: n(p.H.front, 10), angle: n(p.H.angle, 60), zero: n(p.H.zero, 0) },
+      user: { xValue: n(p.user.xValue, 10), angle: n(p.user.angle, 60), zero: n(p.user.zero, 0), velocity: n(p.user.velocity, 3240) },
+      vTrue: n(p.vTrue, 3240),
+      dacPoints: (Array.isArray(p.dacPoints) ? p.dacPoints : []).slice(0, 30).filter((q) => isFinite(+q.sp) && isFinite(+q.db)).map((q) => ({ sp: +q.sp, db: +q.db })),
+      gain: n(p.gain, null), freq: n(p.freq, 4), crystal: n(p.crystal, 10),
+    };
+  }
+
   /** Buat catatan hasil ujian untuk diunduh siswa. */
   UT.buildResultRecord = function (o) {
     return {
@@ -40,6 +53,7 @@
       elapsedMs: Math.round(o.elapsedMs || 0),
       score: Math.round(o.result.score * 10) / 10,
       rows: cleanRows(o.rows),
+      process: cleanProcess(o.process),
     };
   };
 
@@ -65,7 +79,7 @@
       student: String(obj.student || '').slice(0, 60), code, level: obj.level,
       gen: obj.gen === 2 ? 2 : 1, // file tanpa 'gen' berasal dari v0.3–v0.5
       T: num(obj.T), date: String(obj.date || '').slice(0, 40), elapsedMs: Math.max(0, +obj.elapsedMs || 0),
-      score: num(obj.score), rows: cleanRows(obj.rows),
+      score: num(obj.score), rows: cleanRows(obj.rows), process: cleanProcess(obj.process),
     };
   };
 
@@ -83,6 +97,12 @@
   UT.regradeRecord = function (rec) {
     const { ex, truth } = UT.examTruth(rec.code, rec.level, rec.gen || 1);
     const res = UT.gradeExam(truth, rec.rows, { t: ex.T });
+    if (ex.level.process) {
+      const proc = rec.process ? UT.gradeProcess(Object.assign({ T: ex.T }, rec.process)) : { score: 0, parts: { kalibrasi: 0, dac: 0, gain: 0 }, notes: ['data proses tidak ada'] };
+      res.reportScore = res.score;
+      res.process = proc;
+      res.score = UT.combineScore({ score: res.reportScore }, proc);
+    }
     const claimed = rec.score;
     const status = claimed == null ? 'tanpa nilai' : Math.abs(claimed - res.score) <= 0.6 ? 'cocok' : 'berbeda';
     return { result: res, status, T: ex.T, level: ex.level };

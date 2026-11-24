@@ -111,4 +111,66 @@
     }
     return { verdict: 'terima', text: `Panjang ${length.toFixed(1)} mm ≤ batas ${lim.toFixed(1)} mm (t = ${t} mm): dapat diterima.` };
   };
+
+  // ------------------------------------------------------------------ AWS D1.1 (struktur baja, beban statis)
+  /**
+   * Rating indikasi AWS D1.1: d = a − b − c (dB)
+   *   a = gain saat puncak indikasi tepat di garis referensi
+   *   b = gain saat puncak lubang Ø1,5 mm (0,06 in) blok IIW tepat di garis referensi
+   *   c = faktor atenuasi = 2 dB per inci SP setelah inci pertama (dibulatkan ke dB terdekat)
+   * Batas kelas (tabel kriteria UT, bangunan beban statis) per rentang tebal & sudut probe:
+   *   [batas atas kelas A, batas atas kelas B, batas atas kelas C]; di atasnya kelas D.
+   * PENTING: tabel ini disusun untuk edukasi – cocokkan dengan edisi AWS D1.1 yang berlaku sebelum dipakai.
+   */
+  UT.AWS = {
+    refLine: 50, // tinggi garis referensi (%FSH)
+    table: [
+      { tMin: 8, tMax: 20, cls: { 70: [5, 6, 7] } },
+      { tMin: 20, tMax: 38, cls: { 70: [2, 3, 4] } },
+      { tMin: 38, tMax: 65, cls: { 70: [-2, 0, 2], 60: [1, 3, 5], 45: [3, 5, 7] } },
+    ],
+    lenB: 19, // 3/4 in
+    lenC: 50, // 2 in (setengah tebal bagian tengah)
+  };
+
+  /** Faktor atenuasi c (dB) dari SP (mm). */
+  UT.awsAttenuation = (spMm) => Math.max(0, Math.round(2 * (spMm / 25.4 - 1)));
+
+  /** Gain ternormalisasi: gain yang membuat amplitudo amp% tepat di garis referensi. */
+  UT.awsGainAtRef = (gain, ampPct) => gain - 20 * Math.log10(ampPct / UT.AWS.refLine);
+
+  /**
+   * Evaluasi AWS D1.1. in: { a, b, sp, t, angle, length (mm|null), depth (mm|null) }
+   * out: { verdict, d, c, cls, text }
+   */
+  UT.evaluateAWS = function (inp) {
+    const A = UT.AWS;
+    if (inp.b == null) return { verdict: 'nodac', text: 'Belum ada reference level b. Rekam echo lubang Ø1,5 mm pada blok IIW V1 (sisi B) di kartu DAC.' };
+    const row = A.table.find((r) => inp.t >= r.tMin && inp.t <= r.tMax) || null;
+    const th = row && row.cls[Math.round(inp.angle)];
+    const c = UT.awsAttenuation(inp.sp);
+    const d = Math.round(inp.a - inp.b - c);
+    const base = { d, c };
+    if (!row) return Object.assign(base, { verdict: 'nodac', text: `Tebal ${inp.t} mm di luar rentang tabel simulator (8–65 mm).` });
+    if (!th) {
+      const ok = Object.keys(row.cls).map((x) => x + '°').join('/');
+      return Object.assign(base, { verdict: 'nodac', text: `Untuk tebal ${inp.t} mm tabel AWS memakai probe ${ok}. Ganti sudut probe.` });
+    }
+    const cls = d <= th[0] ? 'A' : d <= th[1] ? 'B' : d <= th[2] ? 'C' : 'D';
+    const desc = { A: 'diskontinuitas besar', B: 'diskontinuitas sedang', C: 'diskontinuitas kecil', D: 'diskontinuitas minor' }[cls];
+    const pre = `d = a − b − c = ${inp.a.toFixed(1)} − ${inp.b.toFixed(1)} − ${c} ≈ ${d >= 0 ? '+' : ''}${d} dB → Kelas ${cls} (${desc}). `;
+    Object.assign(base, { cls });
+    if (cls === 'A') return Object.assign(base, { verdict: 'tolak', text: pre + 'Ditolak berapa pun panjangnya.' });
+    if (cls === 'D') return Object.assign(base, { verdict: 'terima', text: pre + 'Dapat diterima berapa pun panjang dan lokasinya.' });
+    let lim = A.lenB, where = '';
+    if (cls === 'C') {
+      const z = inp.depth;
+      const mid = z != null && z >= inp.t / 4 && z <= (3 * inp.t) / 4;
+      lim = mid ? A.lenC : A.lenB;
+      where = z == null ? '' : mid ? ' (setengah tebal bagian tengah)' : ' (seperempat tebal atas/bawah)';
+    }
+    if (inp.length == null) return Object.assign(base, { verdict: 'ukur', text: pre + `Ukur panjang (6 dB drop): ditolak bila > ${lim} mm${where}.` });
+    if (inp.length > lim) return Object.assign(base, { verdict: 'tolak', text: pre + `Panjang ${inp.length.toFixed(1)} mm > ${lim} mm${where}: ditolak.` });
+    return Object.assign(base, { verdict: 'terima', text: pre + `Panjang ${inp.length.toFixed(1)} mm ≤ ${lim} mm${where}: dapat diterima (periksa juga jarak antar-indikasi).` });
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -102,37 +102,184 @@
     ctx.fillStyle = COL.bg;
     ctx.fillRect(0, 0, v.cw, v.ch);
 
-    if (o.spec.type === 'las') drawWeld(ctx, v, o, X, Z);
+    // Las memanjang pipa: gambar benda uji datar dibengkokkan ke bentuk anulus lewat proxy kanvas
+    const dc = o.seamR ? seamProxy(ctx, v, o.seamR) : ctx;
+    if (o.spec.type === 'las') drawWeld(dc, v, o, X, Z);
+    else if (o.spec.type === 'korosi') drawKorosi(ctx, v, o, X, Z);
     else drawBlock(ctx, v, o, X, Z);
 
-    drawScale(ctx, v, X, Z, o.spec);
+    drawScale(dc, v, X, Z, o.spec);
 
     if (o.coverage) drawCoverage(ctx, o.coverage, X, Z);
-    if (o.state.showDefects && (o.spec.type === 'las' || o.spec.type === 'par')) drawDefects(ctx, o.spec.scene, X, Z, o.state.probeY);
+    if (o.state.showDefects && (o.spec.type === 'las' || o.spec.type === 'par')) drawDefects(dc, o.spec.scene, X, Z, o.state.probeY);
 
     if (o.technique === 'tofd') {
       drawTofd(ctx, o, X, Z);
       ctx.restore();
       return;
     }
-    if (o.technique === 'paut' && o.state.showBeam) drawFan(ctx, o, X, Z, o.spMaxTrue);
-    if (o.state.showBeam) drawBeam(ctx, o, X, Z, o.spMaxTrue);
-    drawSkipMarks(ctx, o, X, Z);
+    if (o.technique === 'paut' && o.state.showBeam && o.pautAngles && !o.path) drawFan(ctx, o, X, Z, o.spMaxTrue);
+    if (o.technique === 'paut' && o.state.showBeam && o.escan) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(123,44,191,0.28)';
+      ctx.lineWidth = 1;
+      [o.escan.x0, (o.escan.x0 + o.escan.x1) / 2, o.escan.x1].forEach((x) => strokeRay(ctx, X, Z, o.spec.T, o.escan.angle, x, o.dir, 0, o.spMaxTrue));
+      ctx.restore();
+    }
+    if (o.path) {
+      if (o.state.showBeam) drawPathBeam(ctx, o, X, Z);
+      drawPathMarks(ctx, o, X, Z);
+    } else {
+      if (o.state.showBeam) drawBeam(ctx, o, X, Z, o.spMaxTrue);
+      drawSkipMarks(ctx, o, X, Z);
+    }
 
     // Gate pada sinar menurut kalibrasi alat
     if (o.gate) {
       ctx.strokeStyle = COL.gate;
       ctx.lineWidth = 4;
       ctx.globalAlpha = 0.55;
-      strokeUserRay(ctx, o, X, Z, Math.max(0, o.gate.start), Math.max(0, o.gate.end));
+      if (o.userPath) strokePath(ctx, o.userPath, X, Z, Math.max(0, o.gate.start), Math.max(0, o.gate.end));
+      else strokeUserRay(ctx, o, X, Z, Math.max(0, o.gate.start), Math.max(0, o.gate.end));
       ctx.globalAlpha = 1;
     }
     if (o.peakSP != null && o.peakSP > 0) drawMarker(ctx, o, X, Z, o.peakSP, COL.peak, 'diamond');
     if (o.hoverSP != null && o.hoverSP > 0) drawMarker(ctx, o, X, Z, o.hoverSP, COL.marker, 'cross');
 
-    drawProbe(ctx, o, X, Z);
+    drawProbe(dc, o, X, Z);
     ctx.restore();
   };
+
+  // ------------------------------------------------------------------ lintasan umum (seam pipa, anisotropi)
+  /**
+   * Proxy kanvas: menerima koordinat piksel "datar" (x = busur, z = kedalaman) dan menggambarnya
+   * pada bidang anulus pipa. Garis panjang dipecah agar ikut melengkung.
+   */
+  function seamProxy(ctx, v, Ro) {
+    const mp = (px, py) => {
+      const x = (px - v.ox) / v.s, z = (py - v.oz) / v.s;
+      const q = UT.seamToUV(Ro, x, z);
+      return [v.ox + q.u * v.s, v.oz + q.v * v.s];
+    };
+    let cur = null;
+    const seg = (x, y) => {
+      if (!cur) { const m = mp(x, y); ctx.moveTo(m[0], m[1]); cur = [x, y]; return; }
+      const n = Math.max(1, Math.ceil(Math.hypot(x - cur[0], y - cur[1]) / 5));
+      for (let k = 1; k <= n; k++) {
+        const m = mp(cur[0] + ((x - cur[0]) * k) / n, cur[1] + ((y - cur[1]) * k) / n);
+        ctx.lineTo(m[0], m[1]);
+      }
+      cur = [x, y];
+    };
+    const api = {
+      beginPath() { ctx.beginPath(); cur = null; },
+      closePath() { ctx.closePath(); },
+      moveTo(x, y) { const m = mp(x, y); ctx.moveTo(m[0], m[1]); cur = [x, y]; },
+      lineTo(x, y) { seg(x, y); },
+      quadraticCurveTo(cx, cy, x, y) {
+        const p0 = cur || [x, y];
+        for (let k = 1; k <= 12; k++) {
+          const t = k / 12, a = (1 - t) * (1 - t), b = 2 * (1 - t) * t, c = t * t;
+          seg(a * p0[0] + b * cx + c * x, a * p0[1] + b * cy + c * y);
+        }
+      },
+      arc(x, y, r, a0, a1, ccw) { const m = mp(x, y); ctx.arc(m[0], m[1], r, a0, a1, ccw); cur = null; },
+      rect(x, y, w, h) { api.moveTo(x, y); seg(x + w, y); seg(x + w, y + h); seg(x, y + h); ctx.closePath(); },
+      fillRect(x, y, w, h) { ctx.beginPath(); cur = null; api.rect(x, y, w, h); ctx.fill(); },
+      strokeRect(x, y, w, h) { ctx.beginPath(); cur = null; api.rect(x, y, w, h); ctx.stroke(); },
+      fillText(t, x, y) { const m = mp(x, y); ctx.fillText(t, m[0], m[1]); },
+    };
+    return new Proxy(ctx, {
+      get(target, prop) {
+        if (prop in api) return api[prop];
+        const val = target[prop];
+        return typeof val === 'function' ? val.bind(target) : val;
+      },
+      set(target, prop, value) { target[prop] = value; return true; },
+    });
+  }
+
+  /** Posisi & arah pada lintasan untuk SP s. */
+  function pathAt(path, s) {
+    const P = path.pts;
+    for (let i = 1; i < P.length; i++) {
+      const a = P[i - 1], b = P[i];
+      if (s <= b.s || i === P.length - 1) {
+        const L = Math.max(1e-9, b.s - a.s), t = Math.min(1, Math.max(0, (s - a.s) / L));
+        return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, ux: (b.x - a.x) / L, uz: (b.z - a.z) / L };
+      }
+    }
+    return { x: P[0].x, z: P[0].z, ux: 0, uz: 1 };
+  }
+
+  function strokePath(ctx, path, X, Z, sp0, sp1) {
+    if (sp1 <= sp0) return;
+    ctx.beginPath();
+    const a = pathAt(path, sp0);
+    ctx.moveTo(X(a.x), Z(a.z));
+    path.pts.forEach((p) => { if (p.s > sp0 && p.s < sp1) ctx.lineTo(X(p.x), Z(p.z)); });
+    const b = pathAt(path, sp1);
+    ctx.lineTo(X(b.x), Z(b.z));
+    ctx.stroke();
+  }
+
+  function drawPathBeam(ctx, o, X, Z) {
+    const path = o.path, cr = o.crystal || o.state.crystal, g6 = o.derived.gamma6;
+    const smax = Math.min(o.spMaxTrue, path.pts[path.pts.length - 1].s);
+    const steps = Math.max(40, Math.ceil(smax / 0.6)), h = smax / steps;
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < steps; i++) {
+      const A = pathAt(path, i * h + 1e-6), B = pathAt(path, (i + 1) * h - 1e-6);
+      const wa = UT.beamHalfWidth(i * h, cr, g6), wb = UT.beamHalfWidth((i + 1) * h, cr, g6);
+      const na = [A.uz, -A.ux], nb = [A.uz, -A.ux]; // segmen pendek: normal segmen awal
+      ctx.moveTo(X(A.x - na[0] * wa), Z(A.z - na[1] * wa));
+      ctx.lineTo(X(B.x - nb[0] * wb), Z(B.z - nb[1] * wb));
+      ctx.lineTo(X(B.x + nb[0] * wb), Z(B.z + nb[1] * wb));
+      ctx.lineTo(X(A.x + na[0] * wa), Z(A.z + na[1] * wa));
+      ctx.closePath();
+    }
+    ctx.fillStyle = COL.beam;
+    ctx.fill('nonzero');
+    ctx.strokeStyle = COL.ray;
+    ctx.lineWidth = 1.5;
+    strokePath(ctx, path, X, Z, 0, smax);
+    // sinar menurut alat (lurus/tanpa pembelokan) bila berbeda dengan lintasan sebenarnya
+    if (o.userPath && o.showUserPath) {
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = 'rgba(40,40,40,0.65)';
+      ctx.lineWidth = 1.2;
+      strokePath(ctx, o.userPath, X, Z, 0, smax);
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  function drawPathMarks(ctx, o, X, Z) {
+    const P = o.path.pts;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,119,204,0.9)';
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    let k = 0;
+    for (let i = 1; i < P.length - 1 && P[i].s < o.spMaxTrue; i++) {
+      const refl = o.seamR ? true : P[i].z < 1e-6 || Math.abs(P[i].z - o.spec.T) < 1e-6;
+      if (!refl) continue;
+      k++;
+      ctx.beginPath();
+      ctx.arc(X(P[i].x), Z(P[i].z), 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.fillText(['½ skip', '1 skip', '1½ skip', '2 skip'][k - 1] || '', X(P[i].x), Z(P[i].z) - 6);
+      if (k >= 4) break;
+    }
+    if (o.seamR && o.pathHitsID === false) {
+      ctx.fillStyle = '#c0392b';
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Berkas tidak mengenai dinding dalam pipa (sudut terlalu besar untuk t/D ini)', 8, 30);
+    }
+    ctx.restore();
+  }
 
   // ------------------------------------------------------------------ benda uji
   /** Apakah posisi y berada di dalam salah satu rentang. */
@@ -417,7 +564,7 @@
     const xu = sp * sn + off * cs;
     const zu = sp * cs - off * sn;
     const f = UT.foldDepth(Math.max(0, zu), o.spec.T);
-    return { x: o.state.probeX + o.dir * xu, z: zu < 0 ? 0 : f.z };
+    return { x: (o.beamX != null ? o.beamX : o.state.probeX) + o.dir * xu, z: zu < 0 ? 0 : f.z };
   }
 
   function drawBeam(ctx, o, X, Z, spMax) {
@@ -435,10 +582,12 @@
       ctx.clip();
     }
     ctx.beginPath();
+    const cr = o.crystal || o.state.crystal;
+    const hw = (r) => (o.focus && o.lambda ? UT.focusedHalfWidth(r, cr, pd.gamma6, o.focus, o.lambda) : UT.beamHalfWidth(r, cr, pd.gamma6));
     for (let i = 0; i < steps; i++) {
       const a = i * h, b = (i + 1) * h;
-      const wa = UT.beamHalfWidth(a, o.crystal || o.state.crystal, pd.gamma6);
-      const wb = UT.beamHalfWidth(b, o.crystal || o.state.crystal, pd.gamma6);
+      const wa = hw(a);
+      const wb = hw(b);
       const p1 = foldedPoint(o, a, -wa), p2 = foldedPoint(o, b, -wb);
       const p3 = foldedPoint(o, b, wb), p4 = foldedPoint(o, a, wa);
       ctx.moveTo(X(p1.x), Z(p1.z));
@@ -451,7 +600,7 @@
     ctx.fill('nonzero');
     ctx.strokeStyle = COL.ray;
     ctx.lineWidth = 1.5;
-    strokeRay(ctx, X, Z, o.spec.T, o.H.angle, o.state.probeX, o.dir, 0, spMax);
+    strokeRay(ctx, X, Z, o.spec.T, o.H.angle, o.beamX != null ? o.beamX : o.state.probeX, o.dir, 0, spMax);
     ctx.restore();
   }
 
@@ -498,8 +647,9 @@
   }
 
   function drawMarker(ctx, o, X, Z, spUser, color, kind) {
-    const l = UT.locate(spUser, o.angleUser, o.spec.T, o.userIndexX, o.dir);
-    const cx = X(l.x), cz = Z(l.depth);
+    let cx, cz;
+    if (o.userPath) { const q = pathAt(o.userPath, spUser); cx = X(q.x); cz = Z(q.z); }
+    else { const l = UT.locate(spUser, o.angleUser, o.spec.T, o.userIndexX, o.dir); cx = X(l.x); cz = Z(l.depth); }
     ctx.save();
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -607,6 +757,35 @@
   }
 
   // ------------------------------------------------------------------ probe
+  /** Pelat korosi: penampang di posisi y probe. Profil dasar hanya diperlihatkan pada mode guru. */
+  function drawKorosi(ctx, v, o, X, Z) {
+    const sp = o.spec, y = o.state.probeY, show = o.state.showDefects;
+    ctx.beginPath();
+    ctx.moveTo(X(sp.xMin), Z(0));
+    ctx.lineTo(X(sp.xMax), Z(0));
+    for (let x = sp.xMax; x >= sp.xMin - 1e-9; x -= 0.5) ctx.lineTo(X(x), Z(show ? sp.thick(x, y) : sp.T));
+    ctx.closePath();
+    ctx.fillStyle = COL.plate;
+    ctx.fill();
+    ctx.strokeStyle = COL.plateEdge;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    if (show) {
+      // tebal nominal sebagai garis putus-putus
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = 'rgba(214,40,40,0.7)';
+      ctx.beginPath(); ctx.moveTo(X(sp.xMin), Z(sp.T)); ctx.lineTo(X(sp.xMax), Z(sp.T)); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.fillStyle = COL.muted;
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Penampang di y = ${y.toFixed(0)} mm · tebal nominal ${sp.T} mm${show ? '' : ' · profil dasar disembunyikan (mode guru mati)'}`, 8, 14);
+    ctx.restore();
+  }
+
   function drawStraightProbe(ctx, o, X, Z) {
     const xp = o.state.probeX, hw = o.H.front, h = 20;
     ctx.save();
@@ -620,7 +799,17 @@
     // kristal di dasar probe
     ctx.fillStyle = COL.probe;
     const cr = o.state.crystal / 2;
-    ctx.fillRect(X(xp - cr), Z(-2.5), X(xp + cr) - X(xp - cr), Z(0) - Z(-2.5) - 1);
+    if (o.state.dual) {
+      // probe dual: dua kristal di atas delay line, dipisah sekat akustik
+      const dl = 5;
+      ctx.fillStyle = 'rgba(230,200,120,0.6)';
+      ctx.fillRect(X(xp - cr - 1), Z(-dl), X(xp + cr + 1) - X(xp - cr - 1), Z(0) - Z(-dl));
+      ctx.fillStyle = COL.probe;
+      ctx.fillRect(X(xp - cr), Z(-dl - 2.5), X(xp - 0.6) - X(xp - cr), Z(-dl) - Z(-dl - 2.5));
+      ctx.fillRect(X(xp + 0.6), Z(-dl - 2.5), X(xp + cr) - X(xp + 0.6), Z(-dl) - Z(-dl - 2.5));
+      ctx.strokeStyle = '#111';
+      ctx.beginPath(); ctx.moveTo(X(xp), Z(-h)); ctx.lineTo(X(xp), Z(0)); ctx.stroke();
+    } else ctx.fillRect(X(xp - cr), Z(-2.5), X(xp + cr) - X(xp - cr), Z(0) - Z(-2.5) - 1);
     // kabel
     ctx.strokeStyle = '#444';
     ctx.lineWidth = 2;
@@ -631,7 +820,7 @@
     ctx.fillStyle = COL.text;
     ctx.font = 'bold 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`0° · ${o.state.freq} MHz (probe lurus)`, X(xp), Z(-h - 9) - 6);
+    ctx.fillText(`0° · ${o.state.freq} MHz (${o.state.dual ? 'probe dual TR' : 'probe lurus'})`, X(xp), Z(-h - 9) - 6);
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillStyle = COL.muted;
     ctx.fillText(`posisi: ${xp.toFixed(1)} mm`, X(xp), Z(-h - 9) + 8);

@@ -128,6 +128,20 @@
   };
 
   /**
+   * Setengah lebar berkas −6 dB berkas terfokus (fokus elektronik Phased Array, bidang aktif).
+   * F = jarak fokus sepanjang berkas (mm). Fokus hanya efektif di dalam near field (F < N);
+   * di luar itu berkas berperilaku seperti tanpa fokus.
+   */
+  UT.focusedHalfWidth = function (r, crystal, gamma6, F, lambda) {
+    const N = (crystal * crystal) / (4 * lambda);
+    if (!F || F >= 0.95 * N) return UT.beamHalfWidth(r, crystal, gamma6);
+    const w0 = 0.25 * crystal;
+    const wF = (0.51 * lambda * F) / crystal; // lebar di titik fokus (batas difraksi)
+    const u = w0 * (1 - r / F);
+    return Math.sqrt(wF * wF + u * u);
+  };
+
+  /**
    * Hitung lokasi reflektor dari sound path (SP), seperti yang dilakukan flaw detector.
    * xE = posisi exit point probe, dir = arah berkas (+1 ke kanan, -1 ke kiri).
    */

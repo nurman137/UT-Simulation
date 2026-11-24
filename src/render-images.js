@@ -87,6 +87,76 @@
     ctx.drawImage(offscreen, lay.L, lay.T, lay.w, lay.h);
   }
 
+  /** Warna peta tebal: merah (tipis) → kuning → hijau → biru (nominal). f = tebal/nominal. */
+  UT.thickColor = function (f) {
+    const stops = [[0.5, [200, 30, 30]], [0.7, [240, 140, 20]], [0.85, [235, 220, 60]], [0.95, [90, 190, 90]], [1.0, [40, 110, 200]]];
+    if (f <= stops[0][0]) return stops[0][1];
+    for (let i = 1; i < stops.length; i++) {
+      if (f <= stops[i][0]) {
+        const [a, ca] = stops[i - 1], [b, cb] = stops[i], t = (f - a) / (b - a);
+        return ca.map((v, k) => Math.round(v + (cb[k] - v) * t));
+      }
+    }
+    return stops[stops.length - 1][1];
+  };
+
+  /**
+   * C-scan peta tebal. Data kolom-mayor data[c*rows + r] = tebal terukur (mm) atau NaN (tidak ada echo).
+   * o: { cols, rows, data, done, T, xMax, yMax, probe:{x,y}, min:{t,x,y}|null }
+   */
+  UT.drawCScan = function (ctx, lay, o) {
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, lay.cw, lay.ch);
+    blit(ctx, lay, o.cols, o.rows, (px) => {
+      for (let c = 0; c < o.cols; c++) {
+        for (let r = 0; r < o.rows; r++) {
+          const k = (r * o.cols + c) * 4;
+          px[k + 3] = 255;
+          if (c >= o.done) { px[k] = px[k + 1] = px[k + 2] = 235; continue; }
+          const t = o.data[c * o.rows + r];
+          if (!isFinite(t)) { px[k] = px[k + 1] = px[k + 2] = 120; continue; }
+          const col = UT.thickColor(t / o.T);
+          px[k] = col[0]; px[k + 1] = col[1]; px[k + 2] = col[2];
+        }
+      }
+    });
+    const { L, T, w, h } = lay;
+    ctx.strokeStyle = '#8a96a3';
+    ctx.strokeRect(L + 0.5, T + 0.5, w - 1, h - 1);
+    axes(ctx, lay, { xMin: 0, xMax: o.xMax, yMin: 0, yMax: o.yMax, xLabel: 'x (mm)', yLabel: 'y (mm)' });
+    // skala warna tebal
+    const x = L + w + 8;
+    for (let i = 0; i < h; i++) {
+      const f = 1 - (i / h) * 0.5;
+      const c = UT.thickColor(f);
+      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx.fillRect(x, T + i, 10, 1);
+    }
+    ctx.strokeRect(x + 0.5, T + 0.5, 10, h - 1);
+    ctx.fillStyle = '#4b5864';
+    ctx.font = '9px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${o.T}`, x, T - 1 + 9);
+    ctx.fillText(`${(o.T / 2).toFixed(0)}`, x, T + h - 2);
+    // posisi probe
+    const PX = L + (o.probe.x / o.xMax) * w, PY = T + (o.probe.y / o.yMax) * h;
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(PX, PY, 5, 0, 2 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PX - 8, PY); ctx.lineTo(PX + 8, PY); ctx.moveTo(PX, PY - 8); ctx.lineTo(PX, PY + 8); ctx.stroke();
+    if (o.min && o.done >= o.cols) {
+      const MX = L + (o.min.x / o.xMax) * w, MY = T + (o.min.y / o.yMax) * h;
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeRect(MX - 6, MY - 6, 12, 12);
+      ctx.fillStyle = '#111';
+      ctx.font = 'bold 11px system-ui, sans-serif';
+      ctx.textAlign = MX > L + w / 2 ? 'right' : 'left';
+      ctx.fillText(`min ${o.min.t.toFixed(1)} mm`, MX + (MX > L + w / 2 ? -9 : 9), MY - 8);
+    }
+    ctx.restore();
+  };
+
   /**
    * Citra persegi (B-scan / D-scan). Data kolom-mayor: data[c*rows + r].
    * o: { cols, rows, data, done, gainLin (mentah → %FSH), rf (true = RF grayscale),

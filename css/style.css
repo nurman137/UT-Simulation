@@ -362,3 +362,11 @@ input[type="range"] { width: 100%; }
 .readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brand .ver { display: block; margin-left: 0; }
 }
+.awsref { border-top: 1px dashed #c9d3dd; margin-top: 8px; padding-top: 6px; }
+.seg { display: inline-flex; }
+.seg .btn { border-radius: 0; }
+.seg .btn:first-child { border-radius: 6px 0 0 6px; }
+.seg .btn:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
+.seg .btn.on { background: #7b2cbf; color: #fff; border-color: #7b2cbf; }
+.delaylaw { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+.delaylaw svg { background: #f4effa; border-radius: 4px; }

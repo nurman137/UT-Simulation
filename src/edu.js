@@ -163,6 +163,7 @@
           ${exam.level.training ? '<li>Kalibrasi probe di <b>Blok IIW</b> (X-value, zero, sudut).</li>' : ''}
           ${exam.level.autoDac ? '<li>DAC sudah disediakan; gain diatur ke gain scanning (reference + 6 dB).</li>'
             : '<li>Buat DAC di <b>Blok kalibrasi ASME</b>, lalu atur gain scanning (+6 dB).</li>'}
+          ${exam.level.process ? '<li><b>Proses ikut dinilai (30%)</b>: nilai kalibrasi di alat (X-value, sudut, zero, velocity), kurva DAC, dan gain scanning saat jawaban dikirim. Biarkan gain pada gain scanning ketika mengirim.</li>' : ''}
           <li>Scan seluruh panjang las (geser probe sepanjang las dengan ↑ ↓ atau tampak atas) dari kedua sisi.</li>
           <li>Untuk setiap indikasi ≥ 20% DAC: ukur panjang (6 dB drop), tentukan interpretasi, lalu “+ Tambah dari pembacaan” di Laporan indikasi. Periksa keputusan terima/tolak.</li>
           <li>Echo geometri (akar las, kaki cap) bukan cacat, jangan dilaporkan.</li>
@@ -175,6 +176,10 @@
       <td>${Math.round(p.parts.deteksi)}</td><td>${Math.round(p.parts.lokasi)}</td><td>${Math.round(p.parts.panjang)}</td>
       <td>${Math.round(p.parts.jenis)}</td><td>${Math.round(p.parts.keputusan)}</td><td><b>${Math.round(p.total)}</b></td>
       <td class="small">${esc(p.notes.join('; '))}</td></tr>`).join('');
+    const P = R.process;
+    const procHTML = P ? `<p class="small"><b>Proses ${Math.round(P.score)}/100</b> — kalibrasi ${Math.round(P.parts.kalibrasi)}/40 ·
+      DAC ${Math.round(P.parts.dac)}/40 · gain scanning ${Math.round(P.parts.gain)}/20${P.notes.length ? ` <span class="muted">(${esc(P.notes.join('; '))})</span>` : ''}<br>
+      Nilai akhir = 70% laporan (${Math.round(R.reportScore)}) + 30% proses (${Math.round(P.score)}).</p>` : '';
     const fc = R.falseCalls.length
       ? `<p class="small bad">Indikasi palsu (−10 poin per indikasi): ${R.falseCalls.map((o) => '#' + (o.j + 1)).join(', ')}</p>` : '';
     return `<div class="edu-head"><b>Hasil ujian</b>
@@ -184,10 +189,10 @@
       <button type="button" class="btn" data-a="newExam">Ujian baru</button></span></div>
       <p class="muted small">Serahkan file hasil (.json) atau laporan (.html) ke instruktur. Instruktur mengimpornya di tab <b>Rekap kelas</b>.</p>
       <p class="bigscore">Nilai <b>${Math.round(R.score)}</b> / 100
-        <span class="muted small">(rata-rata per cacat ${Math.round(R.base)}${R.penalty ? `, −${R.penalty} indikasi palsu` : ''})</span></p>
+        <span class="muted small">(${P ? `laporan ${Math.round(R.reportScore)}, proses ${Math.round(P.score)}; ` : ''}rata-rata per cacat ${Math.round(R.base)}${R.penalty ? `, −${R.penalty} indikasi palsu` : ''})</span></p>
       <div class="tablewrap"><table class="reptable"><thead><tr><th>#</th><th>Cacat sebenarnya</th><th>Lokasi</th><th>Laporan</th>
       <th>Deteksi /40</th><th>Lokasi /15</th><th>Panjang /15</th><th>Jenis /15</th><th>Keputusan /15</th><th>Total</th><th>Catatan</th></tr></thead>
-      <tbody>${det}</tbody></table></div>${fc}
+      <tbody>${det}</tbody></table></div>${fc}${procHTML}
       <p class="muted small">Cacat kini ditampilkan (mode guru). Geser probe untuk mempelajari echo yang terlewat.</p>`;
   }
 
@@ -202,14 +207,15 @@
     app.setMaterial('cs');
     app.setWave('T');
     Object.assign(S, {
-      bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, rootFace: 1.5,
+      bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, rootFace: 1.5, code: 'asme', awsB: null, _angleBefore: null, dual: false,
       T: ex.T, bevelHalf: 30, rootGap: 2, cap: true, rootBead: true,
       scenario: 'acak', randSeed: code, randCount: ex.count, randGen: 2, showDefects: false,
       probeY: 150, side: 'kiri', angle: 60, freq: 4, crystal: 10, velocity: C.material.vT, gateLevel: 20, probeX: null,
     });
     app.locks.truth = app.locks.scenario = app.locks.autoCal = true;
     app.training = ex.level.training;
-    app.newProbe(ex.level.training);
+    if (ex.level.process) app.newProbe(UT.rng((code * 104729) ^ 0x3c3c)); // galat probe dari kode soal
+    else app.newProbe(ex.level.training);
     app.dac = UT.dacCreate();
     S.gain = 46;
     if (ex.level.autoDac) {
@@ -237,10 +243,23 @@
     if (rows.length && !window.confirm(`Kirim ${rows.length} indikasi untuk dinilai?`)) return;
     exam.elapsed = Date.now() - exam.start;
     exam.result = UT.gradeExam(app.spec.scene.truth, rows, { t: exam.T });
+    let process = null;
+    if (exam.level.process) {
+      process = {
+        H: Object.assign({}, app.H),
+        user: { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity },
+        vTrue: app.trueV(), dacPoints: app.dac.points.map((p) => ({ sp: p.sp, db: p.db })),
+        gain: S.gain, freq: S.freq, crystal: S.crystal,
+      };
+      const proc = UT.gradeProcess(Object.assign({ T: exam.T }, process));
+      exam.result.reportScore = exam.result.score;
+      exam.result.process = proc;
+      exam.result.score = UT.combineScore({ score: exam.result.reportScore }, proc);
+    }
     exam.submitted = true;
     exam.record = UT.buildResultRecord({
       student: $('inStudent').value.trim(), code: exam.code, levelId: exam.level.id, T: exam.T, gen: 2,
-      date: new Date().toLocaleString('id-ID'), elapsedMs: exam.elapsed, rows, result: exam.result,
+      date: new Date().toLocaleString('id-ID'), elapsedMs: exam.elapsed, rows, result: exam.result, process,
     });
     rowsLocked = true;
     app.locks.truth = false;
@@ -423,7 +442,7 @@
   }
 
   function printReport() {
-    const html = UT.buildReportHTML(reportData());
+    const html = UT.trHTML ? UT.trHTML(UT.buildReportHTML(reportData())) : UT.buildReportHTML(reportData());
     const w = window.open('', '_blank');
     if (!w) { downloadReport(); return; }
     w.document.open();
@@ -444,7 +463,7 @@
   const safeName = (s) => (s || 'siswa').replace(/[^\w\-]+/g, '_');
 
   function downloadReport() {
-    saveFile(UT.buildReportHTML(reportData()), 'text/html', `laporan-ut-${safeName($('inStudent').value.trim())}.html`);
+    saveFile(UT.trHTML ? UT.trHTML(UT.buildReportHTML(reportData())) : UT.buildReportHTML(reportData()), 'text/html', `laporan-ut-${safeName($('inStudent').value.trim())}.html`);
   }
 
   function saveResult() {
