@@ -30,16 +30,21 @@
   const gainMem = { ut: null, paut: null, tofd: null };
   const tofd = { mA: null, mB: null, hoverT: null, nextMark: 'mA' };
   const isTech = (t) => S.technique === t;
+  const tcgActive = () => !!S.tcg && dac.points.length > 0 && !isTech('tofd');
 
   let spec, view = null, sim = null, derived = null, simDirty = true;
   let hoverSP = null, lastPeak = null;
   const cvS = $('cvSection'), cvA = $('cvAscan'), cvT = $('cvTop'), cvI = $('cvImg');
   const ctxS = cvS.getContext('2d'), ctxA = cvA.getContext('2d'), ctxT = cvT.getContext('2d'), ctxI = cvI.getContext('2d');
-  let szA = { w: 0, h: 0 }, szI = { w: 0, h: 0 }, topLay = null;
+  let szA = { w: 0, h: 0 }, szI = { w: 0, h: 0 }, topLay = null, topView = null;
   let lastAx = { delay: 0, range: 1 };
 
   const dir = () => (S.side === 'kiri' ? 1 : -1);
   const isWeld = () => spec && spec.type === 'las';
+  // Scan sejajar las: penampang memanjang; S.probeX = posisi sepanjang las, S.probeY = posisi lateral
+  const isPar = () => S.orient === 'sejajar' && isWeld() && !spec.isPipe;
+  const aspec = () => (isPar() ? UT.parallelSpec(spec) : spec);
+  const NO_COUPLING = { gain: 1, yScale: 1, lossDb: 0, gap: 0 };
   const fmt = (v, d = 1) => (v == null || !isFinite(v) ? '–' : v.toFixed(d));
 
   function applyUserFromTruth() {
@@ -89,6 +94,7 @@
       if (spec.face === 'B') return dir() > 0 ? Math.max(spec.xMin + 2, -(spec.marks.scale.hz * tn + 4)) : 5;
       return dir() > 0 ? -6 : 6;
     }
+    if (isPar()) return dir() > 0 ? 100 : spec.yLen - 100;
     if (spec.type === 'asme') {
       const xs = UT.ASME_BLOCK.holesX;
       return dir() > 0 ? xs[0] - spec.T * 0.25 * tn - 10 : xs[2] + spec.T * 0.75 * tn + 10;
@@ -97,7 +103,7 @@
   }
 
   function limits() {
-    return UT.specimenProbeLimits(spec, dir(), UT.probeBody(H));
+    return UT.specimenProbeLimits(aspec(), dir(), UT.probeBody(H));
   }
 
   function clampProbe() {
@@ -106,13 +112,15 @@
     S.probeX = Math.min(lim.max, Math.max(lim.min, S.probeX));
     if (isWeld()) {
       const hw = UT.PROBE_WIDTH / 2;
-      if (spec.isPipe) S.probeY = ((S.probeY % spec.yLen) + spec.yLen) % spec.yLen;
+      if (isPar()) S.probeY = UT.lateralLimit(spec, S.probeY);
+      else if (spec.isPipe) S.probeY = ((S.probeY % spec.yLen) + spec.yLen) % spec.yLen;
       else S.probeY = Math.min(spec.yLen - hw, Math.max(hw, S.probeY));
     }
   }
 
   function rebuild(resetView = true) {
     spec = UT.buildSpecimen(S);
+    if (S.orient === 'sejajar' && (!isWeld() || spec.isPipe)) S.orient = 'tegak';
     specVersion++;
     if (img && img.meta.kind === 'bscan') img = null;
     clampProbe();
@@ -133,20 +141,32 @@
     rebuild(false);
   }
 
+  /** Benda uji untuk fisika sesuai arah scan (penampang melintang atau memanjang). */
+  function physScene() {
+    if (isPar()) {
+      const ps = UT.parallelSpec(spec);
+      // probe di atas logam las → seluruh lintasan di logam las (penting untuk las austenitik)
+      ps.grain.inWeld.fill(Math.abs(S.probeY) < spec.weld.topHalf ? 1 : 0);
+      return { T: ps.T, scene: ps.scene, grain: S.grain ? ps.grain : null, weld: null, coupling: NO_COUPLING };
+    }
+    return {
+      T: spec.T, scene: spec.scene, grain: S.grain ? spec.grain : null,
+      weld: isWeld() ? spec.weld : null, coupling: couplingNow(),
+    };
+  }
+
   function simAt(x, y, angle, n) {
     const c = cal();
     const spStart = UT.spTrueFromUser(S.delay, c);
     const spEnd = UT.spTrueFromUser(S.delay + S.range, c);
     const pr = { x, y, dir: dir(), angle, freq: probeFreq(), crystal: probeCrystal(), wave: S.wave };
-    return UT.simulate({
-      probe: pr, mat: C.material, T: spec.T, scene: spec.scene,
-      weld: isWeld() ? spec.weld : null, coupling: couplingNow(),
-      grain: S.grain ? spec.grain : null, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
-    });
+    return UT.simulate(Object.assign({
+      probe: pr, mat: C.material, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
+    }, physScene()));
   }
 
   function runSim() {
-    if (isTech('tofd') && isWeld()) {
+    if (isTech('tofd') && isWeld() && !isPar()) {
       const W = UT.tofdWindow(tofdS(), spec.T, C.material.vL);
       sim = UT.simulateTOFD(tofdOpts(S.probeY, W.tStart, W.tEnd, 2400));
       sim.win = W;
@@ -160,11 +180,9 @@
     const pr = { x: S.probeX, y: S.probeY, dir: dir(), angle: physAngle(), freq: probeFreq(), crystal: probeCrystal(), wave: S.wave };
     derived = UT.probeDerived(pr, C.material);
     const n = Math.max(1200, Math.min(9000, Math.ceil((spEnd - spStart) / (derived.lambda / 20))));
-    sim = UT.simulate({
-      probe: pr, mat: C.material, T: spec.T, scene: spec.scene,
-      weld: isWeld() ? spec.weld : null, coupling: couplingNow(),
-      grain: S.grain ? spec.grain : null, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
-    });
+    sim = UT.simulate(Object.assign({
+      probe: pr, mat: C.material, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
+    }, physScene()));
     simDirty = false;
   }
 
@@ -271,6 +289,7 @@
     fillSelect($('inOD'), C.options.ods, (v) => `${v} mm`);
     $('inMaterial').addEventListener('change', (e) => setMaterial(e.target.value));
     $('inWave').addEventListener('change', (e) => setWave(e.target.value));
+    $('inOrient').addEventListener('change', (e) => setOrient(e.target.value));
     sel('inGeom', 'geom', null, () => { resetSizing(); rebuild(); renderDac(); });
     sel('inOD', 'OD', parseFloat, () => { resetSizing(); rebuild(); renderDac(); });
     chk('inContour', 'contour', () => { simDirty = true; updateInfo(); renderDac(); });
@@ -337,6 +356,7 @@
     $('btnGainRef').addEventListener('click', () => { const g = UT.dacRefGain(dac); if (g != null) setGain(g); });
     $('btnGainScan').addEventListener('click', () => { const g = UT.dacRefGain(dac); if (g != null) setGain(g + 6); });
     chk('inShowDac', 'showDac', () => {});
+    chk('inTcg', 'tcg', () => {});
 
     // Sizing
     $('btnY1').addEventListener('click', () => { sizing.y1 = S.probeY; renderSizing(); });
@@ -364,6 +384,12 @@
     chk('inShowBeam', 'showBeam', () => {});
     chk('inGrain', 'grain');
 
+    $('aboutVer').textContent = `v${C.version}`;
+    $('btnAbout').addEventListener('click', () => {
+      const h = $('about');
+      h.hidden = !h.hidden;
+      $('btnAbout').setAttribute('aria-expanded', String(!h.hidden));
+    });
     $('btnHelp').addEventListener('click', () => {
       const h = $('help');
       h.hidden = !h.hidden;
@@ -396,6 +422,28 @@
       Object.assign(S, { side: 'kiri', range: Math.max(75, r), delay: 0, gateStart: 5, gateWidth: Math.max(40, r - 10) });
     }
     S.probeX = null;
+    rebuild();
+    syncControls();
+  }
+
+  /** Arah scan: 'tegak' (berkas melintang las) atau 'sejajar' (berkas searah sumbu las). */
+  function setOrient(o) {
+    if (o === S.orient) return;
+    if (o === 'sejajar') {
+      if (!isWeld() || spec.isPipe) { syncControls(); return; }
+      if (isTech('tofd')) setTechnique('ut');
+      S._perpX = S.probeX;
+      S.probeX = Math.max(40, S.probeY - (dir() > 0 ? 70 : -70)); // posisi sepanjang las
+      S.probeY = 0; // di atas sumbu las (dibatasi bila cap masih ada)
+    } else {
+      const along = S.probeX;
+      S.probeX = S._perpX != null ? S._perpX : null;
+      S.probeY = Math.min(spec.yLen - 10, Math.max(10, along));
+    }
+    S.orient = o;
+    img = null;
+    imgKey = '';
+    resetSizing();
     rebuild();
     syncControls();
   }
@@ -484,12 +532,16 @@
     $('inCount').value = String(S.randCount);
     $('inShowDef').disabled = locks.truth;
     $('btnAutoCal').disabled = locks.autoCal;
-    $('sectionTitle').textContent = weld ? (S.geom === 'pipa' ? `Tampilan scanning (penampang aksial dinding pipa OD ${S.OD})` : 'Tampilan scanning (penampang las)')
+    $('sectionTitle').textContent = weld ? (S.geom === 'pipa' ? `Tampilan scanning (penampang aksial dinding pipa OD ${S.OD})`
+      : S.orient === 'sejajar' ? 'Tampilan scanning (penampang memanjang – scan sejajar las)' : 'Tampilan scanning (penampang las)')
       : `Tampilan scanning (${UT.SPECIMENS.find((s) => s.id === S.specimen).name})`;
     if (roMode !== 'tofd') {
-      $('roXLabel').textContent = weld ? 'Posisi thd sumbu las' : 'Posisi x pada blok';
-      $('roPLabel').textContent = weld ? 'Posisi probe (y)' : 'Tanda index pada blok';
+      const par = S.orient === 'sejajar' && weld;
+      $('roXLabel').textContent = par ? 'Posisi sepanjang las' : weld ? 'Posisi thd sumbu las' : 'Posisi x pada blok';
+      $('roPLabel').textContent = par ? 'Probe: lateral · sepanjang las' : weld ? 'Posisi probe (y)' : 'Tanda index pada blok';
     }
+    $('inOrient').value = S.orient;
+    $('inOrient').disabled = !weld || S.geom === 'pipa' || isTech('tofd');
 
     $('inT').value = String(S.T);
     $('inBevel').value = String(S.bevelHalf);
@@ -516,6 +568,7 @@
     $('inZero').value = S.zero;
     $('inVel').value = S.velocity;
     $('inShowDac').checked = S.showDac;
+    $('inTcg').checked = !!S.tcg;
     $('inScenario').value = S.scenario;
     $('scenarioDesc').textContent = !weld ? 'Skenario cacat hanya berlaku pada benda uji las.'
       : locks.scenario ? 'Mode ujian: cacat dirahasiakan sampai jawaban dikirim.' : UT.findScenario(S.scenario).desc;
@@ -654,6 +707,10 @@
         lines.push('<span class="muted">Echo R100 seharusnya di 100 mm dan 200 mm. Cek sudut 35°–76° dengan lubang Ø50.</span>');
       }
       html = lines.join('<br>');
+    } else if (isPar()) {
+      html = spec.weld.capH > 0
+        ? '<b>Scan sejajar las</b><br><span class="warn">Cap masih ada: probe tidak bisa diletakkan di atas las.</span> <span class="muted">Dari samping las, berkas sejajar tidak mengenai cacat di tengah las. Hilangkan centang “Cap” (cap digerinda rata) untuk scan di atas las.</span>'
+        : '<b>Scan sejajar las</b><br><span class="muted">Berkas searah sumbu las untuk mencari cacat melintang. ← → menggeser probe sepanjang las, ↑ ↓ menggeser probe melintang las.</span>';
     } else if (spec.type === 'asme') {
       html = '<span class="muted">Rekam DAC: maksimalkan tiap echo SDH. Gunakan “puncak gate = 80%” hanya untuk titik pertama, lalu jangan ubah gain saat merekam titik berikutnya.</span>';
     } else {
@@ -671,7 +728,7 @@
   function moveProbeY(y) {
     if (!isWeld()) return;
     const hw = UT.PROBE_WIDTH / 2;
-    const ny = spec.isPipe ? ((y % spec.yLen) + spec.yLen) % spec.yLen : Math.min(spec.yLen - hw, Math.max(hw, y));
+    const ny = isPar() ? UT.lateralLimit(spec, y) : spec.isPipe ? ((y % spec.yLen) + spec.yLen) % spec.yLen : Math.min(spec.yLen - hw, Math.max(hw, y));
     if (ny !== S.probeY) { S.probeY = ny; simDirty = true; }
   }
   function ensureView() {
@@ -686,7 +743,18 @@
   function startDrag(cv, e, withY) {
     if (!view) return;
     const { px, py } = canvasPos(cv, e);
-    const x = UT.viewToWorld(view, px, py).x;
+    if (withY && isPar() && topView && topLay) {
+      // Tampak atas saat scan sejajar: mendatar = lateral (melintang las), tegak = sepanjang las
+      drag = { cv, parTop: true };
+      moveProbeY(UT.viewToWorld(topView, px, py).x);
+      moveProbeTo(topLay.yOf(py));
+      cv.setPointerCapture(e.pointerId);
+      cv.classList.add('dragging');
+      cv.focus({ preventScroll: true });
+      return;
+    }
+    const tv = withY && topView ? topView : view;
+    const x = UT.viewToWorld(tv, px, py).x;
     const ex = UT.probeExtent(S.probeX, dir(), H);
     const onProbe = x >= Math.min(ex.xf, ex.xb) - 3 && x <= Math.max(ex.xf, ex.xb) + 3;
     drag = { cv, withY, off: onProbe ? S.probeX - x : 0, offY: 0 };
@@ -704,7 +772,12 @@
   function moveDrag(e) {
     if (!drag) return;
     const { px, py } = canvasPos(drag.cv, e);
-    moveProbeTo(UT.viewToWorld(view, px, py).x + drag.off);
+    if (drag.parTop) {
+      moveProbeY(UT.viewToWorld(topView, px, py).x);
+      moveProbeTo(topLay.yOf(py));
+      return;
+    }
+    moveProbeTo(UT.viewToWorld(drag.withY && topView ? topView : view, px, py).x + drag.off);
     if (drag.withY && topLay) moveProbeY(topLay.yOf(py) + drag.offY);
   }
   function endDrag() {
@@ -864,14 +937,14 @@
         <label class="inl">Sudut A-scan <input id="inPautA" type="range" min="${UT.PAUT.minA}" max="${UT.PAUT.maxA}" step="1" value="${S.pautAngle}"> <b>${S.pautAngle}°</b></label>`;
     } else if (isTech('tofd')) {
       html = isWeld()
-        ? `<b>TOFD D-scan</b> <label class="inl">PCS <input id="inPcs" type="number" min="10" max="300" step="1" value="${(2 * tofdS()).toFixed(0)}"> mm</label>
+        ? (isPar() ? '<b>TOFD</b> <span class="muted">tidak tersedia untuk scan sejajar las.</span>' : `<b>TOFD D-scan</b> <label class="inl">PCS <input id="inPcs" type="number" min="10" max="300" step="1" value="${(2 * tofdS()).toFixed(0)}"> mm</label>
           <button type="button" class="btn" data-b="pcsAuto">PCS otomatis (⅔T)</button>
           <button type="button" class="btn" data-b="clearMarks">Hapus penanda</button>
-          <span class="muted small">Klik gambar: pindahkan probe ke posisi y tersebut dan pasang penanda kedalaman A/B.</span>`
+          <span class="muted small">Klik gambar: pindahkan probe ke posisi y tersebut dan pasang penanda kedalaman A/B.</span>`)
         : '<b>TOFD</b> <span class="muted">hanya untuk benda uji las.</span>';
     } else {
-      html = `<b>B-scan</b> <button type="button" class="btn" data-b="y"${isWeld() ? '' : ' disabled'}>Rekam sepanjang las (y)</button>
-        <button type="button" class="btn" data-b="x">Rekam melintang (x)</button>
+      html = `<b>B-scan</b> <button type="button" class="btn" data-b="y"${isWeld() && !isPar() ? '' : ' disabled'}>Rekam sepanjang las (y)</button>
+        <button type="button" class="btn" data-b="x">${isPar() ? 'Rekam sepanjang las (arah berkas)' : 'Rekam melintang (x)'}</button>
         ${img && img.meta.kind === 'bscan' ? '<button type="button" class="btn" data-b="close">Tutup</button>' : ''}
         <span class="muted small">Klik gambar untuk memindahkan probe.</span>`;
     }
@@ -882,6 +955,7 @@
     if (t === S.technique) return;
     gainMem[S.technique] = S.gain;
     if (t === 'tofd' && !isWeld()) setSpecimen('las');
+    if (t === 'tofd' && S.orient === 'sejajar') setOrient('tegak');
     S.technique = t;
     if (gainMem[t] != null) S.gain = gainMem[t];
     else if (t === 'tofd') S.gain = 46;
@@ -911,7 +985,7 @@
   function frame() {
     const stacked = window.matchMedia('(max-width: 900px)').matches;
     const wS = cvS.parentElement.clientWidth;
-    const ext = UT.viewExtent(spec, S, dir(), H);
+    const ext = UT.viewExtent(aspec(), S, dir(), H);
     const hS = Math.round(Math.min(520, Math.max(stacked ? 170 : 240, (wS * (ext.z1 - ext.z0)) / (ext.x1 - ext.x0))));
     const hT = isWeld() ? (stacked ? 110 : 130) : 0;
     const wA = cvA.parentElement.clientWidth;
@@ -928,7 +1002,7 @@
     const ra = resizeCanvas(cvA, hA);
     szA = ra;
     if (rs.changed) view = null;
-    if (!view) view = UT.computeView(rs.w, rs.h, UT.viewExtent(spec, S, dir(), H));
+    if (!view) view = UT.computeView(rs.w, rs.h, UT.viewExtent(aspec(), S, dir(), H));
     if (simDirty) runSim();
 
     const tofdOn = isTech('tofd') && isWeld();
@@ -938,9 +1012,11 @@
     const disp = new Float32Array(n);
     const en = C.ELECTRONIC_NOISE;
     const rf = tofdOn || S.rect === 'rf';
+    const tcgOn = tcgActive();
     let maxAmp = 0;
     for (let i = 0; i < n; i++) {
-      const v = (sim.re[i] + (Math.random() - 0.5) * 2 * en) * gl;
+      let v = (sim.re[i] + (Math.random() - 0.5) * 2 * en) * gl;
+      if (tcgOn) v *= UT.tcgFactor(dac, S.delay + (i * S.range) / (n - 1));
       disp[i] = rf ? v : Math.abs(v);
       const a = Math.abs(v);
       if (a > maxAmp) maxAmp = a;
@@ -961,15 +1037,16 @@
       xLabel: tofdOn ? 'waktu (µs)' : 'SP (mm)',
       gate: tofdOn ? null : { start: gStart, end: gEnd, level: S.gateLevel },
       peak, hoverSP: tofdOn ? tofd.hoverT : hoverSP,
-      dacCurve: dacOn ? (sp) => UT.dacAt(dac, sp, S.gain) : null,
-      dacPoints: dacOn ? dac.points.map((p) => ({ sp: p.sp, amp: Math.pow(10, (p.db + S.gain) / 20) })) : null,
+      // Dengan TCG, kurva DAC menjadi garis datar di tinggi referensi
+      dacCurve: dacOn ? (tcgOn ? (sp) => (UT.dacAt(dac, sp, S.gain) == null ? null : UT.tcgLevel(dac, S.gain)) : (sp) => UT.dacAt(dac, sp, S.gain)) : null,
+      dacPoints: dacOn ? dac.points.map((p) => ({ sp: p.sp, amp: tcgOn ? UT.tcgLevel(dac, S.gain) : Math.pow(10, (p.db + S.gain) / 20) })) : null,
     });
 
     const uIdx = userIndexX();
     const spMaxTrue = Math.max(1, UT.spTrueFromUser(S.delay + S.range, cal()));
     ctxS.setTransform(rs.dpr, 0, 0, rs.dpr, 0, 0);
     UT.drawSection(ctxS, view, {
-      spec, state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), derived, spMaxTrue,
+      spec: aspec(), state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), derived, spMaxTrue,
       crystal: probeCrystal(),
       gate: tofdOn ? null : { start: gStart, end: gEnd },
       peakSP: peak.triggered ? peak.sp : null,
@@ -982,9 +1059,13 @@
     if (hT) {
       const rt = resizeCanvas(cvT, hT);
       topLay = UT.topLayout(rt.h, spec.yLen);
+      // Saat scan sejajar, penampang memakai sumbu sepanjang las → tampak atas memakai skala melintang sendiri
+      topView = isPar()
+        ? { s: rt.w / 160, ox: rt.w / 2, oz: 0, x0: -80, x1: 80, cw: rt.w }
+        : Object.assign({}, view, { cw: rt.w });
       ctxT.setTransform(rt.dpr, 0, 0, rt.dpr, 0, 0);
-      UT.drawTopView(ctxT, Object.assign({}, view, { cw: rt.w }), topLay, {
-        spec, state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), sizing, showTruth: S.showDefects,
+      UT.drawTopView(ctxT, topView, topLay, {
+        spec, state: S, dir: dir(), H: Object.assign({}, H, { angle: physAngle() }), sizing, showTruth: S.showDefects, par: isPar(),
         tofdS: tofdOn ? tofdS() : null,
       });
     } else {
@@ -1058,7 +1139,9 @@
       ro.sp = `${fmt(peak.sp)} mm`;
       ro.depth = `${fmt(l.depth)} mm`;
       ro.sd = `${fmt(l.sd)} mm`;
-      if (isWeld()) {
+      if (isPar()) {
+        ro.x = `y ${fmt(l.x)} mm`;
+      } else if (isWeld()) {
         const side = Math.abs(l.x) < 0.05 ? '' : l.x < 0 ? ' (kiri)' : ' (kanan)';
         ro.x = `${l.x >= 0 ? '+' : '−'}${fmt(Math.abs(l.x))} mm${side}`;
       } else {
@@ -1066,7 +1149,8 @@
       }
       ro.leg = String(l.leg);
       if (dac.points.length) {
-        const ref = UT.dacAt(dac, peak.sp, S.gain);
+        const inRange = UT.dacAt(dac, peak.sp, S.gain) != null;
+        const ref = !inRange ? null : tcgActive() ? UT.tcgLevel(dac, S.gain) : UT.dacAt(dac, peak.sp, S.gain);
         if (ref != null) {
           pct = (peak.amp / ref) * 100;
           lastPct = pct;
@@ -1075,7 +1159,8 @@
         } else ro.dac = 'di luar DAC';
       } else ro.dac = 'belum ada DAC';
     }
-    ro.p = isWeld() ? `${S.probeY.toFixed(1)} mm${spec.isPipe ? ` (${clock(S.probeY)})` : ''}` : `${uIdx.toFixed(1)} mm`;
+    ro.p = isPar() ? `x ${S.probeY >= 0 ? '+' : '−'}${Math.abs(S.probeY).toFixed(1)} mm · y ${S.probeX.toFixed(1)}`
+      : isWeld() ? `${S.probeY.toFixed(1)} mm${spec.isPipe ? ` (${clock(S.probeY)})` : ''}` : `${uIdx.toFixed(1)} mm`;
 
     // Evaluasi (hanya las)
     let ev = null;
@@ -1118,6 +1203,9 @@
     applyUserFromTruth, userIndexX, cal,
     setSide,
     setTechnique,
+    get tofdMarks() { return { a: tofd.mA, b: tofd.mB }; },
+    setOrient,
+    isPar,
     setMaterial,
     setWave,
     trueV,

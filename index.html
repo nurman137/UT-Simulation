@@ -11,10 +11,40 @@
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.5 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.6 · acuan ASME Sec. V Art. 4</span>
     </div>
-    <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
+    <span class="btnrow topbtns">
+      <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
+      <button id="btnAbout" class="btn" type="button" aria-expanded="false" aria-controls="about">Tentang</button>
+    </span>
   </header>
+
+  <section id="about" class="help" hidden>
+    <div class="help-cols">
+      <div>
+        <h3>Simulator UT Las <span id="aboutVer"></span></h3>
+        <p class="small">Simulator edukasi Ultrasonic Testing untuk inspeksi las, berjalan sepenuhnya di browser tanpa server. Semua data (laporan, rekap kelas) hanya tersimpan di perangkat pengguna.</p>
+        <h3>Cakupan</h3>
+        <ul class="small notes">
+          <li>UT konvensional probe sudut (A-scan, B-scan), Phased Array S-scan, TOFD.</li>
+          <li>Las pelat (bevel V, X, U) dan pipa (las girth); baja karbon dan austenitik; gelombang geser & longitudinal.</li>
+          <li>Kalibrasi dengan blok IIW V1 (dua sisi), V2 (sisi atas & miring), dan blok kalibrasi dasar ASME (DAC/TCG).</li>
+          <li>Scan tegak lurus dan sejajar las; 12 jenis skenario cacat + cacat acak.</li>
+          <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12, tutorial 9 pelajaran, ujian & rekap kelas.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Model & batasan (penting untuk instruktur)</h3>
+        <ul class="small notes">
+          <li>Penampang 2D: lintasan sinar lurus dengan pantulan di permukaan; amplitudo dari penjumlahan koheren titik-titik permukaan cacat (Huygens/Kirchhoff), profil berkas Gaussian, atenuasi, dan penyebaran berkas.</li>
+          <li>Tidak dimodelkan: konversi mode penuh, pembelokan berkas akibat anisotropi las austenitik, fokus elektronik Phased Array, las memanjang (seam) pada pipa.</li>
+          <li>Nilai amplitudo bersifat kualitatif (proporsi antar-reflektor dibuat realistis, belum divalidasi terhadap alat tertentu). Faktor material dan rugi kopling permukaan lengkung juga kualitatif.</li>
+          <li>Dimensi blok V1/V2 diturunkan dari skala sudut pada blok fisik; blok kalibrasi ASME disederhanakan (tebal blok = tebal las).</li>
+          <li>Simulator ini <b>tidak menggantikan</b> latihan dengan alat dan spesimen nyata, dan laporan yang dihasilkan bukan dokumen inspeksi resmi.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <section id="help" class="help" hidden>
     <div class="help-cols">
@@ -176,6 +206,12 @@
           <option value="L">Longitudinal (LW)</option>
         </select>
       </label>
+      <label>Arah scan
+        <select id="inOrient">
+          <option value="tegak">Tegak lurus las (cacat memanjang)</option>
+          <option value="sejajar">Sejajar las (cacat melintang)</option>
+        </select>
+      </label>
       <label class="check" id="lblContour"><input id="inContour" type="checkbox"> Wedge dikontur sesuai diameter</label>
       <div class="seg" role="group" aria-label="Arah probe">
         <span>Arah berkas</span>
@@ -260,6 +296,8 @@
         <button type="button" id="btnGainScan" class="btn">Gain scanning (+6 dB)</button>
       </div>
       <label class="check"><input id="inShowDac" type="checkbox"> Tampilkan kurva DAC di A-scan</label>
+      <label class="check"><input id="inTcg" type="checkbox"> TCG (Time Corrected Gain)</label>
+      <p class="muted small">TCG menambah gain menurut jarak sesuai DAC: SDH referensi di kedalaman mana pun tampil 80% pada reference level, sehingga kurva DAC menjadi garis datar.</p>
       <ol id="dacList" class="daclist small"></ol>
       <p id="dacWarn" class="warn small" hidden></p>
       <p id="dacMsg" class="warn small" hidden></p>
@@ -349,7 +387,7 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.5 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.6 · ray tracing 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>

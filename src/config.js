@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.5.0',
+    version: '0.6.0',
 
     // Material aktif (objek ini diperbarui oleh UT.setMaterial; referensinya tetap sama)
     material: {},
@@ -55,6 +55,7 @@
 
     defaults: {
       specimen: 'las',
+      orient: 'tegak',
       iiwFace: 'A',
       v2Face: 'A',
       material: 'cs',

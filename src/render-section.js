@@ -38,6 +38,17 @@
   UT.viewExtent = function (spec, state, dir, H) {
     const wd = UT.CONFIG.wedge;
     const z0 = -(wd.height + 17), z1 = spec.T + 10;
+    if (spec.type === 'par') {
+      // Penampang memanjang: tampilkan probe dan ±1,5 skip ke arah berkas
+      const skip = 2 * spec.T * Math.tan(state.angle * DEG);
+      const e = UT.probeExtent(state.probeX, dir, H);
+      const near = Math.min(e.xf, e.xb) - 10, far = Math.max(e.xf, e.xb) + 10;
+      let x0 = dir > 0 ? near : state.probeX - 1.6 * skip - 15;
+      let x1 = dir > 0 ? state.probeX + 1.6 * skip + 15 : far;
+      x0 = Math.max(spec.xMin - 8, x0);
+      x1 = Math.min(spec.xMax + 8, x1);
+      return { x0, x1, z0, z1 };
+    }
     if (spec.type !== 'las') {
       return { x0: spec.xMin - 8, x1: spec.xMax + 8, z0, z1 };
     }
@@ -96,7 +107,7 @@
 
     drawScale(ctx, v, X, Z, o.spec);
 
-    if (o.state.showDefects && o.spec.type === 'las') drawDefects(ctx, o.spec.scene, X, Z, o.state.probeY);
+    if (o.state.showDefects && (o.spec.type === 'las' || o.spec.type === 'par')) drawDefects(ctx, o.spec.scene, X, Z, o.state.probeY);
 
     if (o.technique === 'tofd') {
       drawTofd(ctx, o, X, Z);
@@ -213,8 +224,19 @@
     ctx.beginPath();
     spec.outline.forEach((p, i) => (i ? ctx.lineTo(X(p[0]), Z(p[1])) : ctx.moveTo(X(p[0]), Z(p[1]))));
     ctx.closePath();
-    ctx.fillStyle = COL.plate;
+    // Penampang memanjang: berwarna logam las bila probe berada di atas las
+    const onWeld = spec.type === 'par' && Math.abs(o.state.probeY) < spec.weld.topHalf;
+    ctx.fillStyle = onWeld ? COL.weld : COL.plate;
     ctx.fill();
+    if (spec.type === 'par') {
+      ctx.save();
+      ctx.fillStyle = COL.muted;
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      const lat = o.state.probeY;
+      ctx.fillText(`Penampang memanjang las di x = ${lat >= 0 ? '+' : '−'}${Math.abs(lat).toFixed(1)} mm (${onWeld ? 'logam las' : 'logam induk, di samping las'})`, 8, 14);
+      ctx.restore();
+    }
     ctx.strokeStyle = COL.plateEdge;
     ctx.lineWidth = 1.4;
     ctx.stroke();

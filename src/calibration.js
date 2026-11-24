@@ -64,7 +64,7 @@
   UT.calibrationStatus = function (H, user, vTrue) {
     const items = [
       { key: 'X-value', ok: Math.abs(user.xValue - H.front) <= 1.0 },
-      { key: 'sudut', ok: Math.abs(user.angle - H.angle) <= 1.0 },
+      { key: 'sudut', ok: Math.abs(user.angle - H.angle) <= 1.5 }, // pembacaan skala blok ±1,5° (toleransi cek sudut umumnya ±2°)
       { key: 'zero', ok: Math.abs(user.zero - H.zero) * (vTrue / 2000) <= 0.6 },
       { key: 'velocity', ok: Math.abs(user.velocity - vTrue) / vTrue <= 0.01 },
     ];

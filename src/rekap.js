@@ -13,7 +13,7 @@
   UT.RESULT_TYPE = 'ut-simulator/hasil-ujian';
 
   const num = (v) => (v == null || v === '' || !isFinite(+v) ? null : Math.round(+v * 100) / 100);
-  const ROW_TYPES = ['retak', 'lof', 'ip', 'slag', 'porositas', 'lain'];
+  const ROW_TYPES = ['retak', 'lof', 'ip', 'slag', 'porositas', 'undercut', 'lain'];
 
   /** Bersihkan baris laporan agar hanya berisi field yang dikenal. */
   function cleanRows(rows) {
@@ -34,6 +34,7 @@
       student: String(o.student || '').slice(0, 60),
       code: o.code,
       level: o.levelId,
+      gen: o.gen || 2,
       T: o.T,
       date: o.date,
       elapsedMs: Math.round(o.elapsedMs || 0),
@@ -62,24 +63,25 @@
     return {
       app: 'ut-simulator', type: UT.RESULT_TYPE, version: String(obj.version || ''),
       student: String(obj.student || '').slice(0, 60), code, level: obj.level,
+      gen: obj.gen === 2 ? 2 : 1, // file tanpa 'gen' berasal dari v0.3–v0.5
       T: num(obj.T), date: String(obj.date || '').slice(0, 40), elapsedMs: Math.max(0, +obj.elapsedMs || 0),
       score: num(obj.score), rows: cleanRows(obj.rows),
     };
   };
 
   /** Cacat sebenarnya untuk satu kode soal + tingkat (sama persis dengan soal yang dikerjakan). */
-  UT.examTruth = function (code, levelId) {
+  UT.examTruth = function (code, levelId, gen) {
     const ex = UT.makeExam(code, levelId);
     const S = Object.assign({}, UT.CONFIG.defaults, {
       specimen: 'las', T: ex.T, scenario: 'acak', randSeed: code, randCount: ex.count,
-      bevelType: 'V', geom: 'pelat', bevelHalf: 30, rootGap: 2, cap: true, rootBead: true,
+      bevelType: 'V', geom: 'pelat', bevelHalf: 30, rootGap: 2, cap: true, rootBead: true, randGen: gen || 2,
     });
     return { ex, truth: UT.buildSpecimen(S).scene.truth };
   };
 
   /** Nilai ulang sebuah catatan hasil dari laporan indikasinya. */
   UT.regradeRecord = function (rec) {
-    const { ex, truth } = UT.examTruth(rec.code, rec.level);
+    const { ex, truth } = UT.examTruth(rec.code, rec.level, rec.gen || 1);
     const res = UT.gradeExam(truth, rec.rows, { t: ex.T });
     const claimed = rec.score;
     const status = claimed == null ? 'tanpa nilai' : Math.abs(claimed - res.score) <= 0.6 ? 'cocok' : 'berbeda';
@@ -144,5 +146,5 @@
   };
 
   /** Kunci unik untuk menghindari impor ganda. */
-  UT.recordKey = (rec) => [rec.student, rec.code, rec.level, rec.date, rec.elapsedMs].join('|');
+  UT.recordKey = (rec) => [rec.student, rec.code, rec.level, rec.gen, rec.date, rec.elapsedMs].join('|');
 })(typeof window !== 'undefined' ? window : globalThis);

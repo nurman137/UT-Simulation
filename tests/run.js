@@ -521,5 +521,57 @@ test('V2 sisi miring: sisi miring menyinggung R25, cek sudut 65°–75° dengan 
   assert.deepStrictEqual(blkPeaks(a, 0, 1, 70, 5, 230), [50, 125, 200]);
 });
 
+test('TCG: reflektor referensi tampil 80% di semua jarak pada reference level', () => {
+  const dac = UT.dacCreate();
+  UT.dacAdd(dac, 10, 80, 40); UT.dacAdd(dac, 30, 40, 40); UT.dacAdd(dac, 60, 20, 40);
+  const ref = UT.dacRefGain(dac);
+  [10, 20, 30, 45, 60].forEach((sp) => near(UT.dacAt(dac, sp, ref) * UT.tcgFactor(dac, sp), 80, 1e-9, `SP ${sp}`));
+  near(UT.tcgFactor(dac, 5), UT.tcgFactor(dac, 10), 1e-12, 'di bawah rentang: faktor titik pertama');
+  near(UT.tcgFactor(dac, 90), UT.tcgFactor(dac, 60), 1e-12, 'di atas rentang: faktor titik terakhir');
+  near(UT.tcgLevel(dac, ref + 6), 80 * Math.pow(10, 6 / 20), 1e-9, 'garis referensi naik 6 dB');
+});
+
+console.log('v0.6: cacat melintang, scan sejajar, kompatibilitas soal');
+test('retak melintang: tak terlihat dari scan tegak lurus, terdeteksi dari scan sejajar (70°)', () => {
+  const sp = weldFor({ T: 20, scenario: 'melintang', angle: 70 });
+  const amp = (scene, xs, lat) => {
+    let m = 0;
+    xs.forEach((x) => {
+      const s = UT.simulate({ probe: { x, y: lat, dir: 1, angle: 70, freq: 4, crystal: 10 }, mat: C.material, T: 20, scene: { points: scene.points, corners: scene.corners.filter((c) => c.kind === 'cacat') }, grain: null, spStart: 0, spEnd: 150, n: 2000 });
+      for (let i = 0; i < s.n; i++) m = Math.max(m, Math.abs(s.re[i]));
+    });
+    return m;
+  };
+  const xsPerp = [], xsPar = [];
+  for (let x = -110; x <= -26; x += 1) xsPerp.push(x);
+  for (let x = 100; x <= 148; x += 0.5) xsPar.push(x);
+  const perp = amp(sp.scene, xsPerp, 150), par = amp(sp.scene.par, xsPar, 0);
+  assert.ok(20 * Math.log10(par / perp) > 30, `sejajar ${par} vs tegak ${perp}`);
+});
+test('LOF memanjang: kuat dari scan tegak lurus, lemah dari scan sejajar', () => {
+  const sp = weldFor({ T: 20, scenario: 'lof-kiri' });
+  const s1 = bestOverScan('lof-kiri', 60, 1);
+  let m = 0;
+  for (let x = 40; x <= 160; x += 1) {
+    const s = UT.simulate({ probe: { x, y: -8, dir: 1, angle: 60, freq: 4, crystal: 10 }, mat: C.material, T: 20, scene: sp.scene.par, grain: null, spStart: 0, spEnd: 150, n: 2000 });
+    for (let i = 0; i < s.n; i++) m = Math.max(m, Math.abs(s.re[i]));
+  }
+  assert.ok(20 * Math.log10(s1.amp / m) > 20, `${s1.amp} vs ${m}`);
+});
+test('generator acak: generasi 1 tetap sama (kode soal lama), generasi 2 memuat jenis baru', () => {
+  const g1 = UT.examTruth(555, 'mudah', 1).truth.map((t) => t.type);
+  assert.deepStrictEqual(g1, ['slag']);
+  const seen = new Set();
+  for (let c = 1; c <= 120; c++) UT.examTruth(c, 'sulit', 2).truth.forEach((t) => seen.add(t.orient ? 'melintang' : t.type));
+  ['melintang', 'undercut', 'lof', 'ip'].forEach((k) => assert.ok(seen.has(k), `jenis ${k} muncul`));
+  const old = UT.parseResultFile(JSON.stringify({ type: UT.RESULT_TYPE, code: 555, level: 'mudah', rows: [] }));
+  assert.strictEqual(old.gen, 1, 'file tanpa gen dianggap generasi 1');
+});
+test('scan sejajar: probe tidak bisa di atas las bila cap masih ada', () => {
+  const sp = weldFor({ T: 20, cap: true });
+  assert.ok(Math.abs(UT.lateralLimit(sp, 0)) >= sp.weld.capHalf + 10);
+  assert.strictEqual(UT.lateralLimit(weldFor({ T: 20, cap: false }), 0), 0);
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);

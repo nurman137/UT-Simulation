@@ -160,13 +160,89 @@
         meta: metaFrom('retak', y1, y2, pts.map((p) => p[0]), [w.T - h, w.T]),
       };
     },
+    /**
+     * Retak melintang (tegak lurus sumbu las) di y0, melintang selebar 2·xHalf, kedalaman z1–z2.
+     * Dari scan tegak lurus (berkas di bidang x–z) bidang retak sejajar berkas → echo sangat lemah.
+     * Dari scan sejajar las (berkas searah y) bidang retak menghadap berkas → terdeteksi.
+     */
+    transverse(w, y0, z1, z2, xHalf) {
+      const xs = [], n = 9;
+      // tampak penampang x–z: hanya tepi atas & bawah (difraksi lemah, bidang di luar bidang berkas)
+      const edge = (z) => ({ pts: [[-xHalf, z], [xHalf, z]], two: true, refl: 0.15, y1: y0 - 0.5, y2: y0 + 0.5 });
+      // tampak memanjang y–z: garis zigzag tegak di y0
+      const pp = [];
+      for (let i = 0; i <= n; i++) pp.push([y0 + (i % 2 ? 0.12 : -0.1), z1 + ((z2 - z1) * i) / n]);
+      const par = { polys: [{ pts: pp, two: true, refl: 1, l1: -xHalf, l2: xHalf }], circles: [], corners: [] };
+      if (z1 <= 0.3) par.corners.push({ x: y0, z: 0, s: z2 - z1, face: 0, l1: -xHalf, l2: xHalf });
+      if (z2 >= w.T - 0.3) par.corners.push({ x: y0, z: w.T, s: z2 - z1, face: 0, l1: -xHalf, l2: xHalf });
+      xs.push(-xHalf, xHalf);
+      return {
+        polys: [edge(z1), edge(z2)],
+        par,
+        meta: Object.assign(metaFrom('retak', y0 - 2, y0 + 2, xs, [z1, z2]), { orient: 'melintang' }),
+      };
+    },
+    /** Undercut: alur dangkal di kaki las (permukaan atas), dalam d mm, sepanjang y1–y2. */
+    undercut(w, side, y1, y2, d) {
+      const xt = side * (w.capH > 0 ? w.capHalf : w.topHalf);
+      const pts = [[xt, 0], [xt + side * 0.3, d * 0.6], [xt + side * 0.9, d], [xt + side * 1.6, 0]];
+      return {
+        polys: [{ pts, two: true, refl: 1, y1, y2 }],
+        corners: [{ x: xt, z: 0, s: d, face: 0, y1, y2 }],
+        meta: metaFrom('undercut', y1, y2, pts.map((p) => p[0]), [0, d]),
+      };
+    },
+    /** Retak kaki las: berawal dari kaki cap di permukaan, menjalar ke dalam HAZ sedalam h. */
+    toeCrack(w, side, y1, y2, h) {
+      const xt = side * (w.capH > 0 ? w.capHalf : w.topHalf);
+      const pts = [[xt, 0], [xt + side * 0.4, h * 0.35], [xt + side * 0.2, h * 0.7], [xt + side * 0.7, h]];
+      return {
+        polys: [{ pts, two: true, refl: 1, y1, y2 }],
+        corners: [{ x: xt, z: 0, s: h, face: 0, y1, y2 }],
+        meta: metaFrom('retak', y1, y2, pts.map((p) => p[0]), [0, h]),
+      };
+    },
   };
   UT.DEFECT_BUILDERS = D;
 
+  /**
+   * Representasi penampang memanjang (bidang y–z, untuk scan sejajar las) bila builder tidak
+   * menyediakannya. Koordinat: x = posisi sepanjang las, l1–l2 = rentang melintang las.
+   */
+  function derivePar(p, T) {
+    if (p.par) return p.par;
+    const m = p.meta;
+    const par = { polys: [], circles: [], corners: [] };
+    if (!m) return par;
+    if (m.type === 'porositas') {
+      p.circles.forEach((c) => par.circles.push({ x: c.y, z: c.z, r: c.r, refl: c.refl, l1: c.x - c.r, l2: c.x + c.r }));
+    } else if (m.type === 'slag') {
+      const zc = (m.z1 + m.z2) / 2, hz = (m.z2 - m.z1) / 2, r = Math.min(hz, (m.y2 - m.y1) / 2);
+      const pts = [];
+      for (let k = 0; k <= 8; k++) { const a = Math.PI / 2 + (Math.PI * k) / 8; pts.push([m.y1 + r + r * Math.cos(a), zc - hz * Math.sin(a)]); }
+      for (let k = 0; k <= 8; k++) { const a = -Math.PI / 2 + (Math.PI * k) / 8; pts.push([m.y2 - r + r * Math.cos(a), zc - hz * Math.sin(a)]); }
+      par.polys.push({ pts, closed: true, refl: 1.5, l1: m.x1, l2: m.x2 });
+    } else {
+      // Cacat memanjang (LOF, retak memanjang, IP, undercut): dari arah sejajar hanya ujung-ujungnya
+      // yang memberi difraksi lemah.
+      [m.y1, m.y2].forEach((y) => par.polys.push({ pts: [[y, m.z1], [y, m.z2]], two: true, refl: 0.3, l1: m.x1, l2: m.x2 }));
+      if (m.z1 <= 0.3 || m.z2 >= T - 0.3) {
+        const z = m.z1 <= 0.3 ? 0 : T, s = 0.5 * (m.z2 - m.z1);
+        par.corners.push({ x: m.y1, z, s, face: -1, l1: m.x1, l2: m.x2 });
+        par.corners.push({ x: m.y2, z, s, face: 1, l1: m.x1, l2: m.x2 });
+      }
+    }
+    return par;
+  }
+
   /** Gabungkan beberapa part cacat menjadi satu hasil skenario. */
-  function merge(parts) {
-    const res = { polys: [], circles: [], corners: [], gaps: [], ipRanges: [], metas: [] };
+  function merge(parts, T) {
+    const res = { polys: [], circles: [], corners: [], gaps: [], ipRanges: [], metas: [], par: { polys: [], circles: [], corners: [] } };
     parts.forEach((p) => {
+      const pr = derivePar(p, T);
+      res.par.polys.push(...pr.polys);
+      res.par.circles.push(...pr.circles);
+      res.par.corners.push(...pr.corners);
       if (p.polys) res.polys.push(...p.polys);
       if (p.circles) res.circles.push(...p.circles);
       if (p.corners) res.corners.push(...p.corners);
@@ -181,10 +257,14 @@
    * Cacat acak yang dapat diulang dari kode (seed). Las dibagi menjadi beberapa zona
    * sepanjang sumbu las; setiap zona berisi satu cacat dengan jenis, posisi, dan ukuran acak.
    */
-  UT.randomDefects = function (w, seed, count, yLen) {
+  UT.randomDefects = function (w, seed, count, yLen, gen) {
     const rnd = UT.rng(seed);
     const R = (a, b) => a + rnd() * (b - a);
-    const pool = ['lof', 'ip', 'porositas', 'slag', 'crack', 'root-crack'].filter((t) => !(w.type === 'X' && t === 'root-crack'));
+    // gen 1 = generator v0.3–v0.5 (kode soal lama tetap menghasilkan soal yang sama);
+    // gen 2 (v0.6) menambah retak melintang, undercut, dan retak kaki las.
+    const base = ['lof', 'ip', 'porositas', 'slag', 'crack', 'root-crack'];
+    const pool = (gen >= 2 ? base.concat(['transverse', 'undercut', 'toe']) : base)
+      .filter((t) => !(w.type === 'X' && t === 'root-crack'));
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -236,11 +316,27 @@
         const [ya, yb] = span(12, 35);
         return D.crack(w, z1, z2, ya, yb, R(-0.8, 0.8));
       }
+      if (t === 'transverse') {
+        const yc = R(a + 10, b - 10);
+        const top = rnd() < 0.3; // sebagian retak melintang terbuka di permukaan cap
+        const z1 = top ? 0 : T * R(0.15, 0.35);
+        const z2 = Math.min(z1 + T * R(0.25, 0.45), T - 1.5);
+        const xh = Math.max(2, UT.fusionX(w, (z1 + z2) / 2, 1) * R(0.6, 0.95));
+        return D.transverse(w, yc, z1, z2, xh);
+      }
+      if (t === 'undercut') {
+        const [ya, yb] = span(15, 40);
+        return D.undercut(w, rnd() < 0.5 ? -1 : 1, ya, yb, R(0.5, 1.0));
+      }
+      if (t === 'toe') {
+        const [ya, yb] = span(10, 30);
+        return D.toeCrack(w, rnd() < 0.5 ? -1 : 1, ya, yb, Math.min(4, T * 0.25) * R(0.6, 1));
+      }
       const h = Math.min(4, T * 0.25) * R(0.7, 1);
       const [ya, yb] = span(10, 25);
       return D.rootCrack(w, h, ya, yb, R(-0.5, 0.8));
     });
-    return merge(parts);
+    return merge(parts, w.T);
   };
 
   // Kedalaman LOF untuk skenario tetap: pada bevel X dibatasi ke separuh atas (hindari root face).
@@ -261,43 +357,61 @@
       id: 'lof-kiri',
       name: 'Lack of sidewall fusion – sisi kiri',
       desc: 'Tidak menyatu pada dinding bevel kiri. Paling jelas bila berkas tegak lurus bevel: dari probe di kiri lewat leg 2, atau dari probe di kanan lewat leg 1 (jika terjangkau).',
-      build: (w) => merge([D.lof(w, -1, ...lofZ(w, 0.28, 0.62), 130, 168)]),
+      build: (w) => merge([D.lof(w, -1, ...lofZ(w, 0.28, 0.62), 130, 168)], w.T),
     },
     {
       id: 'lof-kanan',
       name: 'Lack of sidewall fusion – sisi kanan',
       desc: 'Tidak menyatu pada dinding bevel kanan. Coba scan dari kedua sisi las dan bandingkan amplitudonya.',
-      build: (w) => merge([D.lof(w, +1, ...lofZ(w, 0.28, 0.62), 125, 160)]),
+      build: (w) => merge([D.lof(w, +1, ...lofZ(w, 0.28, 0.62), 125, 160)], w.T),
     },
     {
       id: 'ip',
       name: 'Incomplete penetration (IP / LOP)',
       desc: 'Akar las tidak tertembus. Kedua root face membentuk reflektor sudut (corner trap) di dasar pelat → echo kuat, terutama dengan probe 45°. Di luar daerah IP, echo akar las normal tetap ada.',
-      build: (w) => merge([D.ip(w, 115, 185)]),
+      build: (w) => merge([D.ip(w, 115, 185)], w.T),
     },
     {
       id: 'porositas',
       name: 'Porositas (kluster)',
       desc: 'Sekumpulan pori gas kecil. Echo lemah, lebar dan berpuncak banyak; amplitudo berubah cepat saat probe digeser.',
-      build: (w) => merge([D.porositas(w, -inWeldX(w, weldZ(w, 0.45), 0.25), weldZ(w, 0.45), Math.min(1, w.T / 20), 150)]),
+      build: (w) => merge([D.porositas(w, -inWeldX(w, weldZ(w, 0.45), 0.25), weldZ(w, 0.45), Math.min(1, w.T / 20), 150)], w.T),
     },
     {
       id: 'slag',
       name: 'Slag inclusion',
       desc: 'Terak terperangkap di dalam las. Echo sedang dan bergerigi, bentuknya berubah saat probe digeser atau diputar.',
-      build: (w) => merge([D.slag(w, inWeldX(w, weldZ(w, 0.5), 0.5), weldZ(w, 0.5), 144, 158)]),
+      build: (w) => merge([D.slag(w, inWeldX(w, weldZ(w, 0.5), 0.5), weldZ(w, 0.5), 144, 158)], w.T),
     },
     {
       id: 'crack',
       name: 'Retak memanjang di tengah las',
       desc: 'Retak hampir vertikal. Permukaannya sejajar arah berkas sehingga pantulan spekular lemah; yang terlihat terutama echo difraksi dari ujung-ujung retak.',
-      build: (w) => merge([D.crack(w, w.T * 0.3, w.T * 0.68, 135, 170, 0)]),
+      build: (w) => merge([D.crack(w, w.T * 0.3, w.T * 0.68, 135, 170, 0)], w.T),
     },
     {
       id: 'root-crack',
       name: 'Retak akar (root crack)',
       desc: 'Retak yang berawal dari akar las. Bersama dasar pelat membentuk corner trap → echo kuat di kedalaman ≈ T, mudah tertukar dengan echo geometri akar.',
-      build: (w) => merge([D.rootCrack(w, Math.min(4, w.T * 0.25), 140, 162, 0.4)]),
+      build: (w) => merge([D.rootCrack(w, Math.min(4, w.T * 0.25), 140, 162, 0.4)], w.T),
+    },
+    {
+      id: 'melintang',
+      name: 'Retak melintang (tegak lurus sumbu las)',
+      desc: 'Retak melintang las. Dari scan tegak lurus las hampir tidak terlihat karena bidang retak sejajar berkas. Gunakan “Arah scan: sejajar las” (cap harus digerinda rata) untuk mendeteksinya.',
+      build: (w) => merge([D.transverse(w, 150, w.T * 0.2, w.T * 0.65, Math.max(2, UT.fusionX(w, w.T * 0.42, 1) * 0.85))], w.T),
+    },
+    {
+      id: 'undercut',
+      name: 'Undercut di kaki las (kiri)',
+      desc: 'Alur dangkal di kaki las pada permukaan. Echo muncul lewat leg 2 di kedalaman ≈ 0 pada posisi kaki las, mudah tertukar dengan echo geometri kaki cap.',
+      build: (w) => merge([D.undercut(w, -1, 120, 160, 0.8)], w.T),
+    },
+    {
+      id: 'toe-crack',
+      name: 'Retak kaki las (toe crack, kiri)',
+      desc: 'Retak yang berawal dari kaki las dan menjalar ke HAZ. Bersama permukaan atas membentuk corner trap → echo kuat lewat leg 2 di kedalaman ≈ 0.',
+      build: (w) => merge([D.toeCrack(w, -1, 130, 160, Math.min(4, w.T * 0.25))], w.T),
     },
     {
       id: 'campuran',
@@ -307,13 +421,13 @@
         D.lof(w, +1, ...lofZ(w, 0.2, 0.42), 95, 122),
         D.slag(w, -inWeldX(w, w.type === 'X' ? w.T * 0.72 : w.T * 0.62, 0.4), w.type === 'X' ? w.T * 0.72 : w.T * 0.62, 160, 171),
         D.porositas(w, inWeldX(w, w.type === 'X' ? w.T * 0.25 : w.T * 0.8, 0.2), w.type === 'X' ? w.T * 0.25 : w.T * 0.8, 0.7, 215),
-      ]),
+      ], w.T),
     },
     {
       id: 'acak',
       name: 'Acak (latihan, bisa diulang dengan kode)',
       desc: 'Cacat acak sepanjang las. Jenis, posisi, dan ukurannya ditentukan oleh kode soal sehingga bisa diulang atau dibagikan.',
-      build: (w, opt) => UT.randomDefects(w, (opt && opt.seed) || 1, (opt && opt.count) || 2, opt && opt.yLen),
+      build: (w, opt) => UT.randomDefects(w, (opt && opt.seed) || 1, (opt && opt.count) || 2, opt && opt.yLen, (opt && opt.gen) || 2),
     },
   ];
 
@@ -340,7 +454,7 @@
    */
   UT.buildScene = function (w, scenarioId, opt) {
     const sc = UT.findScenario(scenarioId);
-    const res = sc.build(w, opt) || merge([]);
+    const res = sc.build(w, opt) || merge([], w.T);
     const points = [];
     res.polys.forEach((p) => samplePolyline(points, p.pts, p));
     res.circles.forEach((c) => sampleCircle(points, c.x, c.z, c.r, c));
@@ -369,6 +483,20 @@
       corners.push({ x: -w.P, z, s: w.T, face: 1, kind: 'ujung' });
     });
 
+    // Penampang memanjang (scan sejajar las): koordinat x = posisi sepanjang las, y1–y2 = rentang melintang
+    const yLen = (opt && opt.yLen) || UT.CONFIG.weldLength;
+    const parPoints = [];
+    const mapL = (o) => Object.assign({}, o, { y1: o.l1, y2: o.l2 });
+    res.par.polys.forEach((q) => samplePolyline(parPoints, q.pts, mapL(q)));
+    res.par.circles.forEach((c) => sampleCircle(parPoints, c.x, c.z, c.r, mapL(c)));
+    const parCorners = res.par.corners.map((c) => Object.assign({ kind: 'cacat' }, mapL(c)));
+    if (!(opt && opt.pipe)) {
+      [0, w.T].forEach((z) => {
+        parCorners.push({ x: yLen, z, s: w.T, face: -1, kind: 'ujung' });
+        parCorners.push({ x: 0, z, s: w.T, face: 1, kind: 'ujung' });
+      });
+    }
+
     return {
       scenario: sc,
       points,
@@ -377,6 +505,7 @@
       ipRanges: res.ipRanges,
       truth: res.metas,
       rootBead,
+      par: { points: parPoints, corners: parCorners, shapes: { polys: res.par.polys.map(mapL), circles: res.par.circles.map(mapL), gaps: [] } },
     };
   };
 

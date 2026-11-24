@@ -49,6 +49,23 @@
     return null;
   };
 
+  /**
+   * Faktor TCG (Time Corrected Gain) untuk SP tertentu: penguatan tambahan agar reflektor
+   * referensi (SDH) tampil 80% FSH pada reference level di jarak mana pun.
+   * Di luar rentang titik DAC, faktor ujung terdekat dipakai.
+   */
+  UT.tcgFactor = function (dac, sp) {
+    const P = dac.points;
+    if (!P.length) return 1;
+    const ref = UT.dacRefGain(dac);
+    const s = Math.min(P[P.length - 1].sp, Math.max(P[0].sp, sp));
+    const a = P.length === 1 ? Math.pow(10, (P[0].db + ref) / 20) : UT.dacAt(dac, s, ref);
+    return a > 0 ? 80 / a : 1;
+  };
+
+  /** Tinggi garis referensi TCG (%FSH) pada gain tertentu (datar = 80% pada reference level). */
+  UT.tcgLevel = (dac, gain) => 80 * Math.pow(10, (gain - UT.dacRefGain(dac)) / 20);
+
   /** Batas panjang indikasi non-planar yang melebihi reference level (ASME Sec. VIII Div. 1 App. 12). */
   UT.asmeLengthLimit = function (t) {
     if (t <= 19) return 6;
@@ -62,6 +79,7 @@
     { id: 'ip', name: 'Incomplete penetration', planar: true },
     { id: 'slag', name: 'Slag inclusion', planar: false },
     { id: 'porositas', name: 'Porositas', planar: false },
+    { id: 'undercut', name: 'Undercut', planar: false },
     { id: 'lain', name: 'Lainnya / belum diketahui', planar: false },
   ];
 
@@ -77,7 +95,7 @@
     }
     if (pctDAC == null) return { verdict: 'nodac', text: 'Belum ada DAC – buat DAC di blok kalibrasi dasar ASME.' };
     if (pctDAC < 20) return { verdict: 'abaikan', text: 'Di bawah 20% DAC: tidak perlu diselidiki.' };
-    const ty = UT.INDICATION_TYPES.find((x) => x.id === type) || UT.INDICATION_TYPES[5];
+    const ty = UT.INDICATION_TYPES.find((x) => x.id === type) || UT.INDICATION_TYPES.find((x) => x.id === 'lain');
     if (ty.planar) {
       return { verdict: 'tolak', text: `${ty.name}: tidak dapat diterima berapa pun panjangnya.` };
     }

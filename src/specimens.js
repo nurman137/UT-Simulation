@@ -96,7 +96,7 @@
   function buildWeldSpecimen(S) {
     const weld = UT.buildWeld(S);
     const yLen = UT.weldYLen(S);
-    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen });
+    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen, gen: S.randGen || 2, pipe: S.geom === 'pipa' });
     const spec = {
       type: 'las', name: 'Las', T: weld.T, xMin: -weld.P, xMax: weld.P,
       yLen, weld, scene,
@@ -285,6 +285,35 @@
 
   /** Validitas blok kalibrasi lengkung ASME: blok diameter Db berlaku untuk permukaan 0,9–1,5 × Db. */
   UT.curvedBlockOk = (odSurface, odBlock) => odBlock != null && odSurface >= 0.9 * odBlock && odSurface <= 1.5 * odBlock;
+
+  /**
+   * Spesimen penampang memanjang untuk scan sejajar las (bidang y–z). Koordinat x = posisi sepanjang
+   * las; posisi lateral probe (melintang las) dipakai sebagai "y" untuk faktor lebar berkas.
+   */
+  UT.parallelSpec = function (spec) {
+    if (spec.parSpec) return spec.parSpec;
+    const L = spec.yLen, T = spec.T;
+    const ps = {
+      type: 'par', name: 'Penampang memanjang las', T, xMin: 0, xMax: L, yLen: null, base: spec, weld: spec.weld,
+      scene: { points: spec.scene.par.points, corners: spec.scene.par.corners, shapes: spec.scene.par.shapes, ipRanges: [], truth: spec.scene.truth, rootBead: false },
+      outline: [[0, 0], [L, 0], [L, T], [0, T]], holes: [], marks: {},
+    };
+    ps.grain = UT.buildGrain(ps, 31337);
+    ps.grain.inWeld = new Uint8Array(ps.grain.n);
+    spec.parSpec = ps;
+    return ps;
+  };
+
+  /** Posisi lateral yang diizinkan untuk scan sejajar: bila cap ada, probe tidak bisa duduk di atas las. */
+  UT.lateralLimit = function (spec, lat) {
+    const w = spec.weld, hw = (UT.PROBE_WIDTH || 20) / 2;
+    let v = Math.max(-60, Math.min(60, lat));
+    if (w.capH > 0) {
+      const edge = w.capHalf + hw + 0.5;
+      if (Math.abs(v) < edge) v = (v < 0 ? -1 : 1) * edge;
+    }
+    return v;
+  };
 
   UT.buildSpecimen = function (S) {
     if (S.specimen === 'iiw') return buildIIW(S.iiwFace);

@@ -48,6 +48,8 @@ body {
   outline-offset: 1px;
 }
 .topbar .btn { background: transparent; color: #fff; border-color: #4a5c6e; }
+.topbtns { margin: 0; }
+#about { margin-top: 12px; }
 
 .help {
   margin: 12px 16px 0;

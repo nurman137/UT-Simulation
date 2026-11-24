@@ -53,6 +53,13 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [ ] Acuan AWS D1.1 / ISO 11666 — perlu tabel kriteria dari dokumen standar resmi
 - [ ] Rekap kelas daring (penyimpanan bersama antar perangkat) — perlu server/hosting
 
+## v0.6 – Cacat melintang, scan sejajar, TCG ✅
+- [x] Retak melintang, undercut, retak kaki las (skenario tetap & soal acak generasi 2)
+- [x] Arah scan sejajar las: penampang memanjang, posisi lateral, syarat cap digerinda
+- [x] TCG dari DAC
+- [x] Tutorial 5–9 (V2, TOFD, Phased Array, pipa & austenitik, scan sejajar)
+- [x] Panel Tentang (model & batasan), siap rilis di GitHub Pages
+
 ## v1.0
 - [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III
 - [ ] Rilis di GitHub Pages

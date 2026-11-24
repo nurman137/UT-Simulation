@@ -11,6 +11,17 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 
 ## Fitur
 
+### v0.6 – Cacat melintang, scan sejajar las, TCG, tutorial lanjutan
+- **Cacat baru**: retak melintang (tegak lurus sumbu las), undercut, dan retak kaki las (toe crack). Ketiganya juga muncul di soal ujian acak.
+- **Arah scan tegak lurus / sejajar las**.
+  - Retak melintang hampir tak terlihat dari scan tegak lurus (bidang retak sejajar berkas), tetapi terdeteksi dari scan sejajar.
+  - Penampang memanjang las, posisi lateral probe, dan syarat cap digerinda agar probe bisa duduk di atas las.
+- **TCG (Time Corrected Gain)** dari DAC: reflektor referensi di kedalaman mana pun tampil 80% pada reference level, garis DAC menjadi datar, %DAC tetap benar.
+- **Tutorial 5–9**: kalibrasi blok V2, TOFD (sizing tinggi), Phased Array S-scan, pipa & material austenitik, scan sejajar untuk cacat melintang.
+- **Panel “Tentang”**: ringkasan model dan batasan untuk instruktur.
+- Kode soal ujian lama (v0.3–v0.5) tetap menghasilkan soal yang sama saat dinilai ulang di Rekap kelas (generator acak berversi).
+- Toleransi status kalibrasi sudut menjadi ±1,5° (cek sudut probe umumnya ±2°).
+
 ### Blok kalibrasi V1 & V2 (pembaruan)
 - **Blok IIW V1 (ISO 2400 / EN 12223)**, 300 × 100 mm, dengan dua sisi pemindaian:
   - **Sisi A**: R100 dengan tanda pusat (echo 100 dan 200 mm), lubang Ø50 dekat ujung blok, skala sudut 35°–76°.

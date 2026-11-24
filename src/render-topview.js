@@ -129,6 +129,31 @@
       ctx.fillStyle = '#4b5864'; ctx.font = '9px system-ui, sans-serif'; ctx.textAlign = 'center';
       ctx.fillText('12', cx, cy - r - 8 < 8 ? cy - r + 9 : cy - r - 1);
     }
+    if (o.par) {
+      // Scan sejajar: tapak probe di posisi lateral (x = probeY), membentang & menembak searah sumbu las (y)
+      const lat = o.state.probeY;
+      const { xf, xb } = UT.probeExtent(o.state.probeX, o.dir, o.H);
+      const ya = Math.min(xf, xb), yb = Math.max(xf, xb);
+      ctx.fillStyle = 'rgba(80,120,170,0.55)';
+      ctx.strokeStyle = '#2b3440';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(X(lat - hw), Y(ya), X(lat + hw) - X(lat - hw), Math.max(3, Y(yb) - Y(ya)));
+      ctx.strokeRect(X(lat - hw), Y(ya), X(lat + hw) - X(lat - hw), Math.max(3, Y(yb) - Y(ya)));
+      const yEnd = o.state.probeX + o.dir * 2 * spec.T * Math.tan((o.H.angle * Math.PI) / 180);
+      ctx.strokeStyle = '#0077cc';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(X(lat), Y(o.state.probeX)); ctx.lineTo(X(lat), Y(yEnd)); ctx.stroke();
+      ctx.fillStyle = '#0077cc';
+      ctx.beginPath();
+      ctx.moveTo(X(lat), Y(yEnd)); ctx.lineTo(X(lat) - 4, Y(yEnd) - o.dir * 7); ctx.lineTo(X(lat) + 4, Y(yEnd) - o.dir * 7);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#26303a';
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('scan sejajar las', X(lat + hw) + 6, Y(o.state.probeX) + 4);
+      ctx.restore();
+      return;
+    }
     if (o.tofdS != null) {
       // TOFD: pemancar & penerima simetris terhadap sumbu las, dipindai sepanjang las
       [[-o.tofdS, 1], [o.tofdS, -1]].forEach(([x0, d]) => {

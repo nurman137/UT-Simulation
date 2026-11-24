@@ -204,7 +204,7 @@
     Object.assign(S, {
       bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, rootFace: 1.5,
       T: ex.T, bevelHalf: 30, rootGap: 2, cap: true, rootBead: true,
-      scenario: 'acak', randSeed: code, randCount: ex.count, showDefects: false,
+      scenario: 'acak', randSeed: code, randCount: ex.count, randGen: 2, showDefects: false,
       probeY: 150, side: 'kiri', angle: 60, freq: 4, crystal: 10, velocity: C.material.vT, gateLevel: 20, probeX: null,
     });
     app.locks.truth = app.locks.scenario = app.locks.autoCal = true;
@@ -239,7 +239,7 @@
     exam.result = UT.gradeExam(app.spec.scene.truth, rows, { t: exam.T });
     exam.submitted = true;
     exam.record = UT.buildResultRecord({
-      student: $('inStudent').value.trim(), code: exam.code, levelId: exam.level.id, T: exam.T,
+      student: $('inStudent').value.trim(), code: exam.code, levelId: exam.level.id, T: exam.T, gen: 2,
       date: new Date().toLocaleString('id-ID'), elapsedMs: exam.elapsed, rows, result: exam.result,
     });
     rowsLocked = true;
@@ -370,6 +370,22 @@
   function addFromReading() {
     const r = app.reading();
     const z = app.sizing;
+    if (app.isPar && app.isPar()) {
+      // Scan sejajar las: posisi sepanjang las dari pembacaan alat; sizing 6 dB = panjang melintang las
+      const type = S.indType;
+      const Lx = z.y1 != null && z.y2 != null ? Math.abs(z.y2 - z.y1) : null;
+      const yAlong = r ? r.x : S.probeX;
+      const planar = (UT.INDICATION_TYPES.find((x) => x.id === type) || {}).planar;
+      const ev = UT.evaluateASME({ pctDAC: r ? r.pct : null, dacExists: app.dac.points.length > 0, type, length: Lx, t: app.spec.T });
+      rows.push({
+        y1: yAlong - 1, y2: yAlong + 1, depth: r ? r.depth : null,
+        x: Lx != null ? (z.y1 + z.y2) / 2 : S.probeY, pctDAC: r ? r.pct : null,
+        type, verdict: planar || ev.verdict === 'tolak' ? 'tolak' : 'terima',
+        note: `scan sejajar${Lx != null ? `, panjang melintang ${Lx.toFixed(1)} mm` : ''}${r ? '' : ', tidak ada echo di gate'}`,
+      });
+      renderRows();
+      return;
+    }
     const y1 = z.y1 != null ? z.y1 : S.probeY;
     const y2 = z.y2 != null ? z.y2 : S.probeY;
     const type = S.indType;

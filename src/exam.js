@@ -76,7 +76,7 @@
   const distTo = (v, a, b) => (v == null || !isFinite(v) ? Infinity : v < a ? a - v : v > b ? v - b : 0);
   const PLANAR = { lof: true, ip: true, retak: true };
 
-  UT.TYPE_NAMES = { lof: 'Lack of fusion', ip: 'Incomplete penetration', retak: 'Retak', slag: 'Slag inclusion', porositas: 'Porositas', lain: 'Lainnya' };
+  UT.TYPE_NAMES = { lof: 'Lack of fusion', ip: 'Incomplete penetration', retak: 'Retak', slag: 'Slag inclusion', porositas: 'Porositas', undercut: 'Undercut', lain: 'Lainnya' };
 
   /** Keputusan yang benar untuk satu cacat sebenarnya (ASME App. 12). */
   UT.expectedVerdict = function (truth, pctDAC, t) {
