@@ -11,11 +11,12 @@
   function baseSetup(app, o) {
     const S = app.S;
     if (app.setTechnique) app.setTechnique('ut');
-    S.bevelType = 'V';
+    if (app.setMaterial) { app.setMaterial('cs'); app.setWave('T'); }
+    Object.assign(S, { bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false });
     app.locks.truth = app.locks.scenario = app.locks.autoCal = false;
     Object.assign(S, {
       T: 20, bevelHalf: 30, rootGap: 2, rootFace: 1.5, cap: true, rootBead: true,
-      angle: 60, freq: 4, crystal: 10, side: 'kiri', velocity: UT.CONFIG.material.vT,
+      angle: 60, freq: 4, crystal: 10, side: 'kiri', velocity: UT.CONFIG.materials.cs.vT,
       gain: 46, rect: 'full', gateLevel: 20, grain: true, showBeam: true, probeY: 150,
     }, o || {});
     S.probeX = null;

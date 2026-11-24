@@ -58,14 +58,29 @@
     });
   }
 
+  /** Panjang las searah sumbu las: keliling pipa (las girth) atau panjang pelat. */
+  UT.weldYLen = (S) => (S.geom === 'pipa' ? Math.PI * S.OD : UT.CONFIG.weldLength);
+
   function buildWeldSpecimen(S) {
     const weld = UT.buildWeld(S);
-    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount });
+    const yLen = UT.weldYLen(S);
+    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen });
     const spec = {
       type: 'las', name: 'Las', T: weld.T, xMin: -weld.P, xMax: weld.P,
-      yLen: UT.CONFIG.weldLength, weld, scene,
+      yLen, weld, scene,
     };
+    if (S.geom === 'pipa') {
+      // Las girth: bidang berkas = penampang aksial dinding pipa (datar); kelengkungan ada searah keliling (y)
+      spec.isPipe = true;
+      spec.OD = S.OD;
+      spec.R = S.OD / 2;
+      spec.name = `Pipa OD ${S.OD} mm – las girth`;
+    }
     spec.grain = UT.buildGrain(spec, 20240611);
+    // Tandai titik butir yang berada di logam las (noise berbeda untuk las austenitik)
+    const g = spec.grain;
+    g.inWeld = new Uint8Array(g.n);
+    for (let i = 0; i < g.n; i++) g.inWeld[i] = Math.abs(g.xs[i]) < UT.fusionX(weld, g.zs[i], 1) + 0.5 ? 1 : 0;
     return spec;
   }
 
@@ -113,7 +128,7 @@
     return spec;
   }
 
-  function buildASME(T) {
+  function buildASME(T, OD) {
     const B = UT.ASME_BLOCK;
     const d = UT.asmeSdhDiameter(T);
     const points = [];
@@ -130,13 +145,32 @@
       scene: { points, corners, shapes: { polys: [], circles: [], gaps: [] }, ipRanges: [], truth: [], rootBead: false },
       outline, holes, sdhDiameter: d, marks: {},
     };
+    if (OD) { spec.R = OD / 2; spec.OD = OD; spec.name += ` (lengkung, D = ${OD} mm)`; }
     spec.grain = UT.buildGrain(spec, 4242);
     return spec;
   }
 
+  /**
+   * Kopling wedge pada permukaan lengkung (kelengkungan searah keliling / sumbu y).
+   * Wedge datar pada permukaan cembung menyisakan celah di tepi: h = W²/(8R) (W = lebar wedge).
+   * Model kualitatif: rugi transfer ≈ 10 dB per mm celah (maks. 18 dB) dan berkas melebar searah y.
+   * Wedge yang dikontur sesuai diameter menghilangkan sebagian besar rugi tersebut.
+   */
+  UT.coupling = function (spec, contoured) {
+    if (!spec || !spec.R) return { gain: 1, yScale: 1, lossDb: 0, gap: 0 };
+    const W = UT.PROBE_WIDTH || 20;
+    const h = (W * W) / (8 * spec.R);
+    const lossDb = contoured ? 0.5 : Math.min(18, 10 * h);
+    const yScale = contoured ? 1 + 0.5 * h : 1 + 4 * h;
+    return { gain: Math.pow(10, -lossDb / 20), yScale, lossDb, gap: h };
+  };
+
+  /** Validitas blok kalibrasi lengkung ASME: blok diameter Db berlaku untuk permukaan 0,9–1,5 × Db. */
+  UT.curvedBlockOk = (odSurface, odBlock) => odBlock != null && odSurface >= 0.9 * odBlock && odSurface <= 1.5 * odBlock;
+
   UT.buildSpecimen = function (S) {
     if (S.specimen === 'iiw') return buildIIW();
-    if (S.specimen === 'asme') return buildASME(S.T);
+    if (S.specimen === 'asme') return buildASME(S.T, S.asmeCurved ? S.OD : null);
     return buildWeldSpecimen(S);
   };
 })(typeof window !== 'undefined' ? window : globalThis);

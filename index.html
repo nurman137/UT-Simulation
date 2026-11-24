@@ -11,7 +11,7 @@
   <header class="topbar">
     <div class="brand">
       <strong>Simulator UT Las</strong>
-      <span class="ver">v0.4 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v0.5 · acuan ASME Sec. V Art. 4</span>
     </div>
     <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
   </header>
@@ -38,8 +38,10 @@
         </ol>
         <h3>Teknik</h3>
         <p class="small"><b>UT konvensional</b>: A-scan + rekam B-scan. <b>Phased Array</b>: S-scan 40–70°, klik sektor untuk memilih sudut A-scan. <b>TOFD</b>: D-scan sepanjang las; klik gambar untuk memasang penanda kedalaman A/B dan mengukur tinggi cacat.</p>
+        <h3>Pipa &amp; material</h3>
+        <p class="small">Pilih <b>Geometri: Pipa</b> untuk las girth (posisi jam). Wedge datar pada pipa kecil kehilangan banyak energi; centang <b>Wedge dikontur</b> dan buat DAC pada <b>blok lengkung</b>. Untuk <b>baja austenitik</b>, bandingkan gelombang geser (SW) dengan longitudinal (LW).</p>
         <h3>Tutorial &amp; ujian</h3>
-        <p class="small">Pilih <b>Tutorial</b> untuk latihan terpandu, atau <b>Ujian</b> untuk soal acak dengan penilaian otomatis. Catat indikasi di kartu <b>Laporan indikasi</b>, lalu cetak atau unduh laporannya.</p>
+        <p class="small">Pilih <b>Tutorial</b> untuk latihan terpandu, atau <b>Ujian</b> untuk soal acak dengan penilaian otomatis. Catat indikasi di kartu <b>Laporan indikasi</b>, lalu cetak atau unduh laporannya. Setelah ujian, unduh <b>file hasil</b>; instruktur mengimpornya di tab <b>Rekap kelas</b>.</p>
       </div>
     </div>
   </section>
@@ -50,6 +52,7 @@
       <button type="button" class="tab" role="tab" data-act="bebas">Bebas</button>
       <button type="button" class="tab" role="tab" data-act="tutorial">Tutorial</button>
       <button type="button" class="tab" role="tab" data-act="ujian">Ujian</button>
+      <button type="button" class="tab" role="tab" data-act="rekap">Rekap kelas</button>
     </div>
   </nav>
 
@@ -118,10 +121,19 @@
   <section class="controls">
     <fieldset class="card">
       <legend>Benda uji</legend>
+      <label>Material
+        <select id="inMaterial"></select>
+      </label>
       <label>Tebal pelat T (mm)
         <select id="inT"></select>
       </label>
       <div id="weldOnly">
+        <label>Geometri
+          <select id="inGeom">
+            <option value="pelat">Pelat (las lurus)</option>
+            <option value="pipa">Pipa (las girth / keliling)</option>
+          </select>
+        </label>
         <label>Jenis bevel
           <select id="inBevelType"></select>
         </label>
@@ -134,6 +146,10 @@
         <label class="check"><input id="inCap" type="checkbox"> Cap (reinforcement) ada</label>
         <label class="check"><input id="inRoot" type="checkbox"> Root bead (penetrasi) ada</label>
       </div>
+      <label class="check" id="lblAsmeCurved"><input id="inAsmeCurved" type="checkbox"> Blok lengkung (diameter = OD pipa)</label>
+      <label id="lblOD">Diameter luar pipa OD
+        <select id="inOD"></select>
+      </label>
       <p id="specInfo" class="muted small"></p>
     </fieldset>
 
@@ -148,6 +164,13 @@
       <label>Ukuran kristal
         <select id="inCrystal"></select>
       </label>
+      <label>Mode gelombang
+        <select id="inWave">
+          <option value="T">Geser / shear (SW)</option>
+          <option value="L">Longitudinal (LW)</option>
+        </select>
+      </label>
+      <label class="check" id="lblContour"><input id="inContour" type="checkbox"> Wedge dikontur sesuai diameter</label>
       <div class="seg" role="group" aria-label="Arah probe">
         <span>Arah berkas</span>
         <button type="button" id="sideL" class="btn seg-btn">→ kanan</button>
@@ -232,6 +255,7 @@
       </div>
       <label class="check"><input id="inShowDac" type="checkbox"> Tampilkan kurva DAC di A-scan</label>
       <ol id="dacList" class="daclist small"></ol>
+      <p id="dacWarn" class="warn small" hidden></p>
       <p id="dacMsg" class="warn small" hidden></p>
     </fieldset>
 
@@ -311,13 +335,15 @@
         <li>Primary reference level: gain yang membuat titik DAC tertinggi berada di 80% FSH. Pemindaian dilakukan minimal 2× (+6 dB) di atas reference level.</li>
         <li>Berkas sudut diarahkan kira-kira tegak lurus sumbu las, dari dua arah bila memungkinkan.</li>
         <li>App. 12: indikasi &gt; 20% reference level diselidiki. Retak, lack of fusion, dan incomplete penetration tidak diterima berapa pun panjangnya. Indikasi lain ditolak bila melebihi reference level <i>dan</i> panjangnya &gt; 6 mm (t ≤ 19 mm), &gt; t/3 (19–57 mm), atau &gt; 19 mm (t &gt; 57 mm).</li>
-        <li>Koreksi transfer (perbedaan kekasaran permukaan/atenuasi blok vs benda uji) belum dimodelkan.</li>
+        <li>Permukaan lengkung: untuk diameter ≤ 20 in (≈ 508 mm) dipakai blok kalibrasi lengkung; satu blok berdiameter D berlaku untuk permukaan 0,9–1,5 × D.</li>
+        <li>Las austenitik: butir kolumnar kasar di logam las menyebabkan noise dan atenuasi tinggi, terutama untuk gelombang geser; probe gelombang longitudinal (LW) umumnya lebih sesuai.</li>
+        <li>Koreksi transfer (perbedaan kekasaran permukaan/atenuasi blok vs benda uji) belum dimodelkan, kecuali rugi kopling pada permukaan lengkung.</li>
       </ul>
       <p class="muted small">Model fisika disederhanakan untuk keperluan edukasi dan tidak menggantikan latihan dengan alat serta spesimen nyata. Dimensi blok IIW disederhanakan.</p>
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.4 · ray tracing 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v0.5 · ray tracing 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
@@ -329,6 +355,7 @@
   <script src="src/exam.js"></script>
   <script src="src/imaging.js"></script>
   <script src="src/report.js"></script>
+  <script src="src/rekap.js"></script>
   <script src="src/render-section.js"></script>
   <script src="src/render-topview.js"></script>
   <script src="src/render-ascan.js"></script>

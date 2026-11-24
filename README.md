@@ -11,6 +11,27 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 
 ## Fitur
 
+### v0.5 – Pipa, material austenitik & rekap kelas
+- **Pipa – las girth (keliling)**:
+  - OD 114,3–762 mm. Panjang las = keliling π·OD, dengan posisi jam (jam 12 di y = 0).
+  - Probe bisa digeser melingkar, dan tampak atas memuat inset penampang pipa.
+  - Bidang berkas adalah penampang aksial dinding (datar); kelengkungan bekerja searah keliling.
+- **Wedge datar vs dikontur**:
+  - Wedge datar pada permukaan cembung menyisakan celah tepi h = W²/(8R), sehingga berkas melebar searah keliling. Rugi kopling diperkirakan dari celah ini (model kualitatif).
+  - Contoh: OD 114 mm → celah 0,87 mm, rugi ≈ 9 dB.
+- **Blok kalibrasi ASME lengkung**: DAC diberi peringatan bila dibuat pada blok datar untuk diameter ≤ 508 mm, bila diameter blok di luar 0,9–1,5×, atau bila kondisi wedge/material/mode berbeda.
+- **Material baja tahan karat austenitik**:
+  - Noise butir sangat tinggi di logam las (butir kolumnar).
+  - Atenuasi tinggi, plus atenuasi tambahan sepanjang lintasan di dalam logam las.
+- **Mode gelombang probe sudut**: geser (SW) atau longitudinal (LW). Velocity alat ikut menyesuaikan.
+  - Pada las austenitik, LOF di sisi jauh las tenggelam dalam noise dengan SW (SNR ≈ −3 dB) tetapi masih terdeteksi dengan LW (SNR ≈ +8 dB).
+- **Rekap kelas** (tab baru):
+  - Siswa mengunduh **file hasil (.json)**; data yang sama juga tertanam di laporan .html.
+  - Instruktur mengimpor banyak file sekaligus (tombol atau seret-lepas).
+  - Nilai **dihitung ulang** dari kode soal dan laporan indikasi, sehingga angka nilai yang diubah di file ditandai "berbeda".
+  - Tersedia statistik kelas (rata-rata, median, min–maks), persentase deteksi per jenis cacat, dan ekspor CSV (pemisah `;` untuk Excel).
+  - Data rekap tersimpan di browser instruktur.
+
 ### v0.4 – B-scan, Phased Array, TOFD & bevel X/U
 - **Pemilih teknik**: UT konvensional, Phased Array (S-scan), dan TOFD.
 - **B-scan** (UT konvensional): rekam sepanjang las (y) atau melintang (x). Gambar amplitudo terhadap SP, ikut berubah saat gain diubah. Klik gambar untuk memindahkan probe.
@@ -83,11 +104,13 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 | Corner trap | Faktor pantul reflektor sudut 90° sebagai fungsi sudut berkas (untuk IP, retak akar, akar las, ujung pelat) |
 | Noise | Titik hambur butir yang tetap posisinya (speckle konsisten saat probe digeser) + noise elektronik |
 | Panjang cacat | Profil berkas Gaussian searah sumbu las. Di ujung reflektor panjang amplitudo turun tepat 6 dB |
+| Material | Atenuasi, noise butir logam induk/las, dan atenuasi lintasan di dalam las bergantung pada material dan mode gelombang (SW/LW) |
+| Permukaan lengkung | Rugi kopling ≈ 10 dB per mm celah tepi wedge datar (maks. 18 dB); berkas melebar searah keliling |
 | Waktu alat | t = 2·SP/v + zero (wedge). Pembacaan alat memakai velocity dan zero yang dimasukkan pengguna |
 | Phased Array | Setiap sudut sektor disimulasikan sebagai berkas dengan aperture array (9,6 mm) dari exit point yang sama. Fokus elektronik belum dimodelkan |
 | TOFD | Pitch-catch gelombang longitudinal (5920 m/s). Back wall dan cacat dijumlahkan sebagai titik hambur Huygens, sehingga difraksi ujung dan fasenya muncul dari interferensi. Lateral wave = fraksi tetap dari back wall |
 
-Model ini disederhanakan untuk edukasi (2D, tanpa konversi mode penuh, tanpa anisotropi, tanpa fokus elektronik pada Phased Array). Nilai amplitudonya bersifat kualitatif dan tidak menggantikan latihan dengan alat dan spesimen nyata.
+Model ini disederhanakan untuk edukasi (2D, tanpa konversi mode penuh, tanpa pembelokan berkas akibat anisotropi las austenitik, tanpa fokus elektronik pada Phased Array). Faktor material dan rugi kopling bersifat kualitatif. Nilai amplitudonya bersifat kualitatif dan tidak menggantikan latihan dengan alat dan spesimen nyata.
 
 ## Struktur proyek
 
@@ -105,6 +128,7 @@ src/exam.js             soal acak, DAC otomatis, penilaian ujian
 src/imaging.js          B-scan, S-scan Phased Array, simulasi TOFD, akuisisi progresif
 src/render-images.js    gambar B-scan/D-scan dan sektor S-scan
 src/report.js           laporan inspeksi HTML (cetak/PDF/unduh)
+src/rekap.js            file hasil ujian, penilaian ulang, statistik kelas, CSV
 src/tutorial.js         definisi pelajaran tutorial
 src/edu.js              UI aktivitas: tutorial, ujian, tabel laporan
 src/render-section.js   gambar penampang, berkas, probe
@@ -123,4 +147,4 @@ node tests/run.js
 
 ## Rencana berikutnya
 
-Lihat [docs/ROADMAP.md](docs/ROADMAP.md). Rencana berikutnya (v0.5): geometri pipa (las girth), material austenitik, dan rekap nilai ujian satu kelas.
+Lihat [docs/ROADMAP.md](docs/ROADMAP.md).

@@ -57,6 +57,7 @@
     panel.hidden = activity === 'bebas';
     if (activity === 'tutorial') panel.innerHTML = tutorialHTML();
     else if (activity === 'ujian') panel.innerHTML = examHTML();
+    else if (activity === 'rekap') panel.innerHTML = rekapHTML();
     else panel.innerHTML = '';
     lastStatus = '';
   }
@@ -179,7 +180,9 @@
     return `<div class="edu-head"><b>Hasil ujian</b>
       <span class="small">kode ${exam.code} · ${esc(exam.level.name)} · waktu ${fmtTime(exam.elapsed)}</span>
       <span class="btnrow"><button type="button" class="btn primary" data-a="print">Cetak laporan</button>
+      <button type="button" class="btn primary" data-a="saveResult">Unduh hasil (.json)</button>
       <button type="button" class="btn" data-a="newExam">Ujian baru</button></span></div>
+      <p class="muted small">Serahkan file hasil (.json) atau laporan (.html) ke instruktur. Instruktur mengimpornya di tab <b>Rekap kelas</b>.</p>
       <p class="bigscore">Nilai <b>${Math.round(R.score)}</b> / 100
         <span class="muted small">(rata-rata per cacat ${Math.round(R.base)}${R.penalty ? `, −${R.penalty} indikasi palsu` : ''})</span></p>
       <div class="tablewrap"><table class="reptable"><thead><tr><th>#</th><th>Cacat sebenarnya</th><th>Lokasi</th><th>Laporan</th>
@@ -196,8 +199,10 @@
     examLevel = lvEl ? lvEl.value : examLevel;
     const ex = UT.makeExam(code, examLevel);
     app.setTechnique('ut');
+    app.setMaterial('cs');
+    app.setWave('T');
     Object.assign(S, {
-      bevelType: 'V',
+      bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, rootFace: 1.5,
       T: ex.T, bevelHalf: 30, rootGap: 2, cap: true, rootBead: true,
       scenario: 'acak', randSeed: code, randCount: ex.count, showDefects: false,
       probeY: 150, side: 'kiri', angle: 60, freq: 4, crystal: 10, velocity: C.material.vT, gateLevel: 20, probeX: null,
@@ -233,6 +238,10 @@
     exam.elapsed = Date.now() - exam.start;
     exam.result = UT.gradeExam(app.spec.scene.truth, rows, { t: exam.T });
     exam.submitted = true;
+    exam.record = UT.buildResultRecord({
+      student: $('inStudent').value.trim(), code: exam.code, levelId: exam.level.id, T: exam.T,
+      date: new Date().toLocaleString('id-ID'), elapsedMs: exam.elapsed, rows, result: exam.result,
+    });
     rowsLocked = true;
     app.locks.truth = false;
     S.showDefects = true;
@@ -250,6 +259,89 @@
       const el = $('examTimer');
       if (el) el.textContent = t;
     }
+  }
+
+  // ================================================================ rekap kelas
+  const REKAP_KEY = 'ut-rekap-v1';
+  const rekap = []; // { rec, regrade, file }
+  let rekapFilter = '';
+  let rekapMsg = '';
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(REKAP_KEY) || '[]');
+    saved.forEach((r) => {
+      try { const rec = UT.parseResultFile(JSON.stringify(r.rec)); rekap.push({ rec, regrade: UT.regradeRecord(rec), file: r.file }); } catch (e) { /* lewati */ }
+    });
+  } catch (e) { /* penyimpanan tidak tersedia */ }
+  function saveRekap() {
+    try { window.localStorage.setItem(REKAP_KEY, JSON.stringify(rekap.map((e) => ({ rec: e.rec, file: e.file })))); } catch (e) { /* abaikan */ }
+  }
+  const filteredEntries = () => rekap.filter((e) => !rekapFilter || String(e.rec.code) === rekapFilter);
+
+  function importFiles(files) {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    let ok = 0, dup = 0;
+    const errs = [];
+    let pending = list.length;
+    list.forEach((f) => {
+      const fr = new FileReader();
+      fr.onload = () => {
+        try {
+          const rec = UT.parseResultFile(fr.result);
+          if (rekap.some((e) => UT.recordKey(e.rec) === UT.recordKey(rec))) dup++;
+          else { rekap.push({ rec, regrade: UT.regradeRecord(rec), file: f.name }); ok++; }
+        } catch (err) { errs.push(`${f.name}: ${err.message}`); }
+        if (--pending === 0) {
+          rekapMsg = `${ok} file diimpor${dup ? `, ${dup} duplikat dilewati` : ''}${errs.length ? `. Gagal: ${errs.join('; ')}` : ''}.`;
+          saveRekap();
+          renderPanel();
+        }
+      };
+      fr.onerror = () => { errs.push(`${f.name}: tidak bisa dibaca`); if (--pending === 0) renderPanel(); };
+      fr.readAsText(f);
+    });
+  }
+
+  function rekapHTML() {
+    const codes = Array.from(new Set(rekap.map((e) => String(e.rec.code)))).sort();
+    const ents = filteredEntries();
+    const st = UT.summarizeClass(ents);
+    const f0 = (v) => (v == null ? '–' : Math.round(v));
+    const typeRows = Object.keys(st.byType).sort().map((t) => {
+      const v = st.byType[t];
+      return `<tr><td>${esc(UT.TYPE_NAMES[t] || t)}</td><td>${v.found} / ${v.total}</td><td>${Math.round((v.found / v.total) * 100)}%</td></tr>`;
+    }).join('');
+    const rowsHtml = ents.map((e) => {
+      const r = e.regrade.result;
+      const i = rekap.indexOf(e);
+      const stCls = e.regrade.status === 'cocok' ? 'ok' : e.regrade.status === 'berbeda' ? 'bad' : '';
+      return `<tr><td>${esc(e.rec.student || '(tanpa nama)')}</td><td>${e.rec.code}</td><td>${esc(e.regrade.level.name)}</td>
+        <td><b>${Math.round(r.score)}</b></td><td class="${stCls}">${e.rec.score == null ? '–' : Math.round(e.rec.score)} · ${esc(e.regrade.status)}</td>
+        <td>${r.perDefect.filter((p) => p.report).length} / ${r.perDefect.length}</td><td>${r.falseCalls.length}</td>
+        <td>${UT.fmtElapsed(e.rec.elapsedMs)}</td><td class="small">${esc(e.rec.date)}</td>
+        <td><button type="button" class="btn" data-a="rekapDel" data-i="${i}" aria-label="Hapus">✕</button></td></tr>`;
+    }).join('') || '<tr><td colspan="10" class="muted small c">Belum ada hasil. Impor file hasil ujian (.json) atau laporan (.html) dari siswa.</td></tr>';
+    return `<div class="edu-head"><b>Rekap kelas</b>
+        <label class="btn primary filebtn">Impor file hasil… <input id="rekapFiles" type="file" accept=".json,.html,.htm,application/json,text/html" multiple></label>
+        <label class="small">Kode soal <select id="rekapCode"><option value="">semua</option>${codes.map((c) => `<option${c === rekapFilter ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+        <span class="btnrow"><button type="button" class="btn" data-a="rekapCsv"${ents.length ? '' : ' disabled'}>Unduh CSV</button>
+        <button type="button" class="btn" data-a="rekapClear"${rekap.length ? '' : ' disabled'}>Hapus semua</button></span></div>
+      <p class="muted small">Seret file ke panel ini atau pakai tombol impor. Nilai <b>dihitung ulang</b> dari kode soal dan laporan indikasi; kolom “Nilai di file” menandai bila angka di file berbeda. Data tersimpan hanya di browser ini.</p>
+      ${rekapMsg ? `<p class="small">${esc(rekapMsg)}</p>` : ''}
+      <div class="rekapstats">
+        <div><span>Siswa</span><b>${st.n}</b></div><div><span>Rata-rata</span><b>${f0(st.mean)}</b></div>
+        <div><span>Median</span><b>${f0(st.median)}</b></div><div><span>Min – maks</span><b>${f0(st.min)} – ${f0(st.max)}</b></div>
+        <div><span>Cacat ditemukan</span><b>${st.total ? Math.round((st.found / st.total) * 100) + '%' : '–'}</b></div>
+        <div><span>Indikasi palsu</span><b>${st.falseCalls}</b></div>
+      </div>
+      <div class="rekapgrid">
+        <div class="tablewrap"><table class="reptable"><thead><tr><th>Nama</th><th>Kode</th><th>Tingkat</th><th>Nilai</th><th>Nilai di file</th>
+          <th>Ditemukan</th><th>Palsu</th><th>Waktu</th><th>Tanggal</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+        <div><b class="small">Deteksi per jenis cacat</b>
+          <div class="tablewrap"><table class="reptable"><thead><tr><th>Jenis</th><th>Ditemukan</th><th>%</th></tr></thead>
+          <tbody>${typeRows || '<tr><td colspan="3" class="muted small c">–</td></tr>'}</tbody></table></div>
+          <p class="muted small">Jenis dengan persentase rendah perlu dibahas ulang di kelas.</p></div>
+      </div>`;
   }
 
   // ================================================================ laporan indikasi
@@ -310,6 +402,7 @@
       },
       indications: rows.slice(),
       result: exam && exam.submitted ? exam.result : null,
+      record: exam && exam.submitted ? exam.record : null,
     };
   }
 
@@ -323,16 +416,25 @@
     w.focus();
   }
 
-  function downloadReport() {
-    const html = UT.buildReportHTML(reportData());
-    const blob = new Blob([html], { type: 'text/html' });
+  function saveFile(content, type, filename) {
+    const blob = new Blob([content], { type });
     const a = document.createElement('a');
-    const name = ($('inStudent').value.trim() || 'laporan').replace(/[^\w\-]+/g, '_');
     a.href = URL.createObjectURL(blob);
-    a.download = `laporan-ut-${name}.html`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  const safeName = (s) => (s || 'siswa').replace(/[^\w\-]+/g, '_');
+
+  function downloadReport() {
+    saveFile(UT.buildReportHTML(reportData()), 'text/html', `laporan-ut-${safeName($('inStudent').value.trim())}.html`);
+  }
+
+  function saveResult() {
+    if (!exam || !exam.record) return;
+    saveFile(JSON.stringify(exam.record, null, 1), 'application/json',
+      `hasil-ujian-${safeName(exam.record.student)}-${exam.code}.json`);
   }
 
   // ================================================================ event
@@ -361,9 +463,23 @@
     else if (a === 'cancelExam') { if (window.confirm('Batalkan ujian?')) cancelExam(); }
     else if (a === 'newExam') { exam = null; examCode = UT.randomExamCode(app.rand); unlockAll(); renderPanel(); }
     else if (a === 'print') printReport();
+    else if (a === 'saveResult') saveResult();
+    else if (a === 'rekapCsv') saveFile(UT.classCSV(filteredEntries()), 'text/csv', 'rekap-nilai-ut.csv');
+    else if (a === 'rekapClear') { if (window.confirm('Hapus semua data rekap di browser ini?')) { rekap.length = 0; saveRekap(); renderPanel(); } }
+    else if (a === 'rekapDel') { const i = +b.dataset.i; rekap.splice(i, 1); saveRekap(); renderPanel(); }
   });
   panel.addEventListener('change', (e) => {
     if (e.target.name === 'lvl') examLevel = e.target.value;
+    if (e.target.id === 'rekapFiles') importFiles(e.target.files);
+    if (e.target.id === 'rekapCode') { rekapFilter = e.target.value; renderPanel(); }
+  });
+  panel.addEventListener('dragover', (e) => { if (activity === 'rekap') { e.preventDefault(); panel.classList.add('drop'); } });
+  panel.addEventListener('dragleave', () => panel.classList.remove('drop'));
+  panel.addEventListener('drop', (e) => {
+    if (activity !== 'rekap') return;
+    e.preventDefault();
+    panel.classList.remove('drop');
+    importFiles(e.dataTransfer.files);
   });
 
   const repBody = $('repBody');

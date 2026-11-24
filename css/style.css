@@ -248,6 +248,16 @@ kbd {
 .bigscore { font-size: 18px; margin: 4px 0 8px; }
 .bigscore b { font-size: 26px; }
 
+.edupanel.drop { outline: 3px dashed var(--accent); outline-offset: -6px; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.rekapstats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin: 6px 0 10px; }
+.rekapstats div { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+.rekapstats span { display: block; font-size: 11px; color: var(--muted); }
+.rekapstats b { font-size: 16px; }
+.rekapgrid { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); gap: 14px; }
+.edu-head select { max-width: 140px; }
+
 .randrow { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
 .randrow label { margin: 4px 0; }
 .randrow input[type="number"] { width: 100px; }

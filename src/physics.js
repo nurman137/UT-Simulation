@@ -67,6 +67,9 @@
    * pulsa awal (saat kristal ditembakkan) dalam SP baja ekuivalen; bagian negatif berada di dalam wedge.
    * Titik/sudut dengan y1,y2 punya panjang terbatas searah sumbu las; tanpa y1 dianggap menerus.
    * Titik dengan rep {n, step, decay} memberi echo berulang (mis. R100 blok IIW).
+   * probe.wave: 'T' (gelombang geser, bawaan) atau 'L' (longitudinal).
+   * opts.weld (opsional): model las untuk atenuasi lintasan di dalam logam las (material austenitik).
+   * opts.coupling (opsional): { gain, yScale } rugi kopling & penyebaran berkas pada permukaan lengkung.
    * Mengembalikan { re: Float32Array, spStart, spEnd, n }.
    */
   UT.simulate = function (opts) {
@@ -77,8 +80,15 @@
     const sn = Math.sin(th), cs = Math.cos(th), tg = Math.tan(d.gamma6);
     const w0 = 0.25 * probe.crystal;
     const N0 = Math.max(d.N, 1);
-    const alpha = UT.attenDbPerMm(probe.freq);
+    const wave = probe.wave === 'L' ? 'L' : 'T';
+    const alpha = UT.attenDbPerMm(probe.freq) * (mat.att ? mat.att[wave] : 1);
     const attK = (-alpha * 2 * Math.LN10) / 20; // e^(attK·r)
+    // Atenuasi tambahan di dalam logam las (las austenitik: butir kolumnar kasar)
+    const wAtt = opts.weld && mat.weldAtt ? mat.weldAtt[wave] : 0;
+    const wK = (-wAtt * 2 * Math.LN10) / 20;
+    const wW = opts.weld;
+    const coup = opts.coupling || { gain: 1, yScale: 1 };
+    const yS = coup.yScale || 1;
     const xE = probe.x, dir = probe.dir;
     const yP = probe.y == null ? 0 : probe.y;
 
@@ -116,9 +126,24 @@
       const q2 = (perp * perp) / w6sq;
       if (q2 > 14) return 0;
       const r = Math.sqrt(dxh * dxh + zu * zu);
-      bR = r; bDx = dxh; bW6 = Math.sqrt(w6sq);
+      bR = r; bDx = dxh; bW6 = Math.sqrt(w6sq) * yS;
       const spread = Math.pow(N0 / Math.sqrt(N0 * N0 + r * r), 1.5);
-      return Math.pow(0.5, q2) * spread * Math.exp(attK * r);
+      let a = Math.pow(0.5, q2) * spread * Math.exp(attK * r);
+      if (wAtt > 0) a *= Math.exp(wK * weldLen(x, zu, r));
+      return a;
+    }
+    // Panjang lintasan (satu arah) di dalam logam las sepanjang sinar terlipat dari exit point ke titik
+    function weldLen(x, zu, r) {
+      const N = 16;
+      let inside = 0;
+      for (let k = 0; k < N; k++) {
+        const t = (k + 0.5) / N;
+        const xs = xE + (x - xE) * t;
+        let z = (zu * t) % (2 * T);
+        if (z > T) z = 2 * T - z;
+        if (Math.abs(xs) < UT.fusionX(wW, z, 1)) inside++;
+      }
+      return (inside / N) * r;
     }
 
     const rMin = spStart - win, rMax = spEnd + win;
@@ -174,6 +199,8 @@
     // 3) Hamburan butir (grain noise)
     if (grain) {
       const { xs, zs, ws } = grain;
+      const gB = mat.grainBase ? mat.grainBase[wave] : 1, gW = mat.grainWeld ? mat.grainWeld[wave] : 1;
+      const inW = grain.inWeld;
       for (let leg = 1; leg <= maxLeg; leg++) {
         const odd = leg % 2 === 1;
         const base = odd ? (leg - 1) * T : leg * T;
@@ -181,10 +208,13 @@
           const zu = odd ? base + zs[i] : base - zs[i];
           const b = beam(xs[i], zu);
           if (b === 0 || bR < rMin || bR > rMax) continue;
-          add(bR, ws[i] * b);
+          add(bR, ws[i] * b * (inW && inW[i] ? gW : gB));
         }
       }
     }
+
+    // Rugi kopling (wedge pada permukaan lengkung) berlaku untuk semua echo dari benda uji
+    if (coup.gain !== 1) for (let j = 0; j < n; j++) re[j] *= coup.gain;
 
     // 4) Pulsa awal (main bang) + gema internal wedge
     if (opts.mainBangSP != null) {

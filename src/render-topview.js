@@ -60,11 +60,22 @@
     ctx.fillStyle = '#6b7785';
     ctx.font = '10px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    for (let y = 0; y <= lay.yLen; y += 50) {
-      const py = Y(y);
-      ctx.strokeStyle = 'rgba(60,70,80,0.45)';
-      ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(8, py); ctx.stroke();
-      if (y > 0 && y < lay.yLen) ctx.fillText(`y ${y}`, 10, py + 3);
+    if (spec.isPipe) {
+      // Posisi jam sepanjang keliling (jam 12 di y = 0)
+      for (let hr = 0; hr < 12; hr++) {
+        const py = Y((hr / 12) * lay.yLen);
+        ctx.strokeStyle = 'rgba(60,70,80,0.45)';
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(hr % 3 ? 4 : 8, py); ctx.stroke();
+        if (hr % 3 === 0 && hr > 0) ctx.fillText(`jam ${hr}`, 10, py + 3);
+      }
+      ctx.fillText('jam 12', 10, Y(0) + 10);
+    } else {
+      for (let y = 0; y <= lay.yLen; y += 50) {
+        const py = Y(y);
+        ctx.strokeStyle = 'rgba(60,70,80,0.45)';
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(8, py); ctx.stroke();
+        if (y > 0 && y < lay.yLen) ctx.fillText(`y ${y}`, 10, py + 3);
+      }
     }
 
     // Cacat (mode guru): proyeksi tampak atas
@@ -102,6 +113,22 @@
     });
 
     const yp = o.state.probeY, hw = UT.PROBE_WIDTH / 2;
+    if (spec.isPipe) {
+      // Inset: penampang melintang pipa dengan posisi probe di keliling
+      const r = Math.min(26, (lay.h - 10) / 2), cx = v.cw - r - 10, cy = lay.top + r + 4;
+      const rIn = r * (1 - (2 * spec.T) / spec.OD);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#c9d1d9';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.arc(cx, cy, Math.max(2, rIn), 0, 2 * Math.PI, true); ctx.fill('evenodd');
+      ctx.strokeStyle = '#5c6773'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 2 * Math.PI); ctx.stroke();
+      const a = (yp / lay.yLen) * 2 * Math.PI - Math.PI / 2;
+      ctx.fillStyle = '#0077cc';
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (r + 2), cy + Math.sin(a) * (r + 2), 4, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#4b5864'; ctx.font = '9px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('12', cx, cy - r - 8 < 8 ? cy - r + 9 : cy - r - 1);
+    }
     if (o.tofdS != null) {
       // TOFD: pemancar & penerima simetris terhadap sumbu las, dipindai sepanjang las
       [[-o.tofdS, 1], [o.tofdS, -1]].forEach(([x0, d]) => {

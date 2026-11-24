@@ -46,7 +46,7 @@
     S.xValue = H.front;
     S.angleUser = H.angle;
     S.zero = Math.round(H.zero * 100) / 100;
-    S.velocity = C.material.vT;
+    S.velocity = trueV();
   }
   function applyUserNominal() {
     S.xValue = C.wedge.front;
@@ -55,7 +55,16 @@
   }
   applyUserFromTruth();
 
-  const cal = () => ({ vTrue: C.material.vT, vUser: S.velocity, zeroTrue: H.zero, zeroUser: S.zero });
+  // Kecepatan sebenarnya untuk material & mode gelombang aktif
+  function trueV() { return UT.waveV(C.material, S.wave); }
+  const cal = () => ({ vTrue: trueV(), vUser: S.velocity, zeroTrue: H.zero, zeroUser: S.zero });
+  const couplingNow = () => UT.coupling(spec, S.contour);
+  const clock = (y) => {
+    const h = (((y / spec.yLen) * 12) % 12 + 12) % 12;
+    let hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+    if (mm === 60) { hh += 1; mm = 0; }
+    return `jam ${hh === 0 ? 12 : hh}:${String(mm).padStart(2, '0')}`;
+  };
   const userIndexX = () => UT.userIndexX(S.probeX, dir(), H, S.xValue);
   // Sudut & kristal efektif: Phased Array memakai sudut sektor terpilih dan aperture array
   const physAngle = () => (isTech('paut') ? S.pautAngle : H.angle);
@@ -92,7 +101,8 @@
     S.probeX = Math.min(lim.max, Math.max(lim.min, S.probeX));
     if (isWeld()) {
       const hw = UT.PROBE_WIDTH / 2;
-      S.probeY = Math.min(spec.yLen - hw, Math.max(hw, S.probeY));
+      if (spec.isPipe) S.probeY = ((S.probeY % spec.yLen) + spec.yLen) % spec.yLen;
+      else S.probeY = Math.min(spec.yLen - hw, Math.max(hw, S.probeY));
     }
   }
 
@@ -122,9 +132,10 @@
     const c = cal();
     const spStart = UT.spTrueFromUser(S.delay, c);
     const spEnd = UT.spTrueFromUser(S.delay + S.range, c);
-    const pr = { x, y, dir: dir(), angle, freq: probeFreq(), crystal: probeCrystal() };
+    const pr = { x, y, dir: dir(), angle, freq: probeFreq(), crystal: probeCrystal(), wave: S.wave };
     return UT.simulate({
       probe: pr, mat: C.material, T: spec.T, scene: spec.scene,
+      weld: isWeld() ? spec.weld : null, coupling: couplingNow(),
       grain: S.grain ? spec.grain : null, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
     });
   }
@@ -141,11 +152,12 @@
     const c = cal();
     const spStart = UT.spTrueFromUser(S.delay, c);
     const spEnd = UT.spTrueFromUser(S.delay + S.range, c);
-    const pr = { x: S.probeX, y: S.probeY, dir: dir(), angle: physAngle(), freq: probeFreq(), crystal: probeCrystal() };
+    const pr = { x: S.probeX, y: S.probeY, dir: dir(), angle: physAngle(), freq: probeFreq(), crystal: probeCrystal(), wave: S.wave };
     derived = UT.probeDerived(pr, C.material);
     const n = Math.max(1200, Math.min(9000, Math.ceil((spEnd - spStart) / (derived.lambda / 20))));
     sim = UT.simulate({
       probe: pr, mat: C.material, T: spec.T, scene: spec.scene,
+      weld: isWeld() ? spec.weld : null, coupling: couplingNow(),
       grain: S.grain ? spec.grain : null, spStart, spEnd, n, mainBangSP: UT.mainBangSP(c),
     });
     simDirty = false;
@@ -240,6 +252,14 @@
     };
 
     sel('inT', 'T', parseFloat, () => { clearDac('tebal benda uji berubah'); resetSizing(); rebuild(); });
+    fillSelect($('inMaterial'), Object.values(C.materials), (m) => m.name, (m) => m.id);
+    fillSelect($('inOD'), C.options.ods, (v) => `${v} mm`);
+    $('inMaterial').addEventListener('change', (e) => setMaterial(e.target.value));
+    $('inWave').addEventListener('change', (e) => setWave(e.target.value));
+    sel('inGeom', 'geom', null, () => { resetSizing(); rebuild(); renderDac(); });
+    sel('inOD', 'OD', parseFloat, () => { resetSizing(); rebuild(); renderDac(); });
+    chk('inContour', 'contour', () => { simDirty = true; updateInfo(); renderDac(); });
+    chk('inAsmeCurved', 'asmeCurved', () => { rebuild(); });
     sel('inBevel', 'bevelHalf', parseFloat, () => rebuild());
     num('inGap', 'rootGap', () => rebuild());
     chk('inCap', 'cap', () => rebuild());
@@ -287,7 +307,10 @@
       dacMsg = '';
       if (!lastPeak || !lastPeak.triggered) dacMsg = 'Tidak ada echo yang melewati level gate. Untuk echo lemah (mis. lewat leg 2) turunkan level gate.';
       else if (lastPeak.amp >= 100) dacMsg = 'Echo jenuh (≥ 100%). Turunkan gain lalu rekam lagi.';
-      else UT.dacAdd(dac, lastPeak.sp, lastPeak.amp, S.gain);
+      else {
+        if (!dac.points.length) dac.meta = { blockOD: spec.type === 'asme' && spec.R ? spec.OD : null, contour: S.contour, material: S.material, wave: S.wave };
+        UT.dacAdd(dac, lastPeak.sp, lastPeak.amp, S.gain);
+      }
       renderDac();
     });
     $('btnDacUndo').addEventListener('click', () => {
@@ -357,6 +380,26 @@
     syncControls();
   }
 
+  function setMaterial(id) {
+    if (S.material === id) return;
+    S.material = id;
+    UT.setMaterial(id);
+    S.velocity = trueV();
+    clearDac('material berubah');
+    rebuild(false);
+    syncControls();
+  }
+
+  function setWave(w) {
+    if (S.wave === w) return;
+    S.wave = w;
+    S.velocity = trueV();
+    clearDac('mode gelombang berubah');
+    simDirty = true;
+    updateInfo();
+    syncControls();
+  }
+
   function setGain(g) {
     S.gain = Math.round(Math.min(90, Math.max(0, g)) * 2) / 2;
     syncControls();
@@ -389,6 +432,16 @@
       b.setAttribute('aria-selected', String(on));
     });
     $('inBevelType').value = S.bevelType;
+    $('inMaterial').value = S.material;
+    $('inWave').value = S.wave;
+    $('inGeom').value = S.geom;
+    $('inOD').value = String(S.OD);
+    $('lblOD').hidden = !(weld && S.geom === 'pipa') && !(S.specimen === 'asme' && S.asmeCurved);
+    $('inContour').checked = S.contour;
+    $('lblContour').hidden = !spec || !spec.R;
+    $('inAsmeCurved').checked = S.asmeCurved;
+    $('lblAsmeCurved').hidden = S.specimen !== 'asme';
+    $('inMaterial').disabled = $('inWave').disabled = $('inGeom').disabled = locks.scenario;
     $('lblBevel').hidden = S.bevelType === 'U';
     renderImgBar();
     $('weldOnly').hidden = !weld;
@@ -401,7 +454,7 @@
     $('inCount').value = String(S.randCount);
     $('inShowDef').disabled = locks.truth;
     $('btnAutoCal').disabled = locks.autoCal;
-    $('sectionTitle').textContent = weld ? 'Tampilan scanning (penampang las)'
+    $('sectionTitle').textContent = weld ? (S.geom === 'pipa' ? `Tampilan scanning (penampang aksial dinding pipa OD ${S.OD})` : 'Tampilan scanning (penampang las)')
       : `Tampilan scanning (${UT.SPECIMENS.find((s) => s.id === S.specimen).name})`;
     if (roMode !== 'tofd') {
       $('roXLabel').textContent = weld ? 'Posisi thd sumbu las' : 'Posisi x pada blok';
@@ -444,7 +497,7 @@
   }
 
   function renderCalStatus() {
-    const st = UT.calibrationStatus(H, { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity }, C.material.vT);
+    const st = UT.calibrationStatus(H, { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity }, trueV());
     const badge = $('calBadge');
     const list = $('calStatus');
     list.innerHTML = '';
@@ -494,6 +547,21 @@
     $('btnGainRef').disabled = $('btnGainScan').disabled = !dac.points.length;
     $('dacMsg').hidden = !dacMsg;
     $('dacMsg').textContent = dacMsg;
+    // Peringatan validitas DAC untuk pipa (ASME: blok lengkung bila D ≤ 20 in ≈ 508 mm)
+    const warn = [];
+    if (dac.points.length && S.geom === 'pipa' && S.specimen === 'las') {
+      const m = dac.meta || {};
+      if (S.OD <= 508 && !UT.curvedBlockOk(S.OD, m.blockOD)) {
+        warn.push(m.blockOD ? `Blok lengkung D = ${m.blockOD} mm hanya berlaku untuk permukaan ${(0.9 * m.blockOD).toFixed(0)}–${(1.5 * m.blockOD).toFixed(0)} mm.`
+          : 'DAC dibuat pada blok datar. Untuk diameter ≤ 20 in (≈ 508 mm) ASME mensyaratkan blok kalibrasi lengkung.');
+      }
+      if (m.contour !== undefined && m.contour !== S.contour) warn.push('Kondisi wedge (datar/dikontur) berbeda dengan saat DAC dibuat.');
+    }
+    if (dac.points.length && dac.meta && (dac.meta.material !== S.material || dac.meta.wave !== S.wave)) {
+      warn.push('DAC dibuat dengan material/mode gelombang lain.');
+    }
+    $('dacWarn').hidden = !warn.length;
+    $('dacWarn').textContent = warn.join(' ');
   }
 
   function renderSizing() {
@@ -510,14 +578,19 @@
     $('skipInfo').textContent = spec.type === 'iiw' ? 'Tinggi blok 100 mm'
       : isTech('tofd') && isWeld() ? `TOFD · PCS = ${(2 * tofdS()).toFixed(1)} mm · ${UT.TOFD.freq} MHz L-wave ${UT.TOFD.angle}°`
         : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${userAngle()}°)`;
-    const d = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: S.angle }, C.material);
+    const d = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: S.angle, wave: S.wave }, C.material);
+    const cp = couplingNow();
     $('probeInfo').textContent =
-      `λ = ${d.lambda.toFixed(2)} mm · near field ≈ ${d.N.toFixed(0)} mm · sebaran berkas −6 dB ≈ ±${(d.gamma6 / DEG).toFixed(1)}°`;
+      `${S.wave === 'L' ? 'Gelombang longitudinal' : 'Gelombang geser'} v = ${trueV()} m/s · λ = ${d.lambda.toFixed(2)} mm · near field ≈ ${d.N.toFixed(0)} mm · sebaran berkas −6 dB ≈ ±${(d.gamma6 / DEG).toFixed(1)}°`
+      + (spec.R ? ` · celah tepi wedge ${cp.gap.toFixed(2)} mm, rugi kopling ≈ ${cp.lossDb.toFixed(1)} dB` : '');
+    const mat = `${C.material.name} (vL ${C.material.vL}, vT ${C.material.vT} m/s)`;
     $('specInfo').textContent = spec.type === 'iiw'
-      ? 'Blok IIW (V1) disederhanakan: tinggi 100 mm, permukaan R100, lubang Ø50, skala sudut 40–75°. Baja karbon.'
+      ? `Blok IIW (V1) disederhanakan: tinggi 100 mm, permukaan R100, lubang Ø50, skala sudut 40–75°. ${mat}.`
       : spec.type === 'asme'
-        ? `Tebal blok = T = ${spec.T} mm. SDH Ø${spec.sdhDiameter} mm pada kedalaman ${(spec.T / 4).toFixed(1)}, ${(spec.T / 2).toFixed(1)}, ${(spec.T * 0.75).toFixed(1)} mm.`
-        : 'Material: baja karbon, vT = 3240 m/s. Panjang las 300 mm.';
+        ? `Tebal blok = T = ${spec.T} mm. SDH Ø${spec.sdhDiameter} mm pada kedalaman ${(spec.T / 4).toFixed(1)}, ${(spec.T / 2).toFixed(1)}, ${(spec.T * 0.75).toFixed(1)} mm.${spec.R ? ` Blok lengkung D = ${spec.OD} mm.` : ''} ${mat}.`
+        : spec.isPipe
+          ? `${mat}. Pipa OD ${spec.OD} mm, keliling ${spec.yLen.toFixed(0)} mm (jam 12 di y = 0).`
+          : `${mat}. Panjang las ${spec.yLen} mm.`;
   }
 
   function renderBlockHelp() {
@@ -550,7 +623,7 @@
   function moveProbeY(y) {
     if (!isWeld()) return;
     const hw = UT.PROBE_WIDTH / 2;
-    const ny = Math.min(spec.yLen - hw, Math.max(hw, y));
+    const ny = spec.isPipe ? ((y % spec.yLen) + spec.yLen) % spec.yLen : Math.min(spec.yLen - hw, Math.max(hw, y));
     if (ny !== S.probeY) { S.probeY = ny; simDirty = true; }
   }
   function ensureView() {
@@ -954,7 +1027,7 @@
         } else ro.dac = 'di luar DAC';
       } else ro.dac = 'belum ada DAC';
     }
-    ro.p = isWeld() ? `${S.probeY.toFixed(1)} mm` : `${uIdx.toFixed(1)} mm`;
+    ro.p = isWeld() ? `${S.probeY.toFixed(1)} mm${spec.isPipe ? ` (${clock(S.probeY)})` : ''}` : `${uIdx.toFixed(1)} mm`;
 
     // Evaluasi (hanya las)
     let ev = null;
@@ -997,9 +1070,12 @@
     applyUserFromTruth, userIndexX, cal,
     setSide,
     setTechnique,
+    setMaterial,
+    setWave,
+    trueV,
     dir,
     calOk() {
-      return UT.calibrationStatus(H, { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity }, C.material.vT).ok;
+      return UT.calibrationStatus(H, { xValue: S.xValue, angle: S.angleUser, zero: S.zero, velocity: S.velocity }, trueV()).ok;
     },
     /** Pembacaan alat untuk puncak gate saat ini, atau null. */
     reading() {

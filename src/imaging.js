@@ -173,8 +173,10 @@
     }
     // Hamburan butir
     if (o.grain) {
-      const { xs, zs, ws } = o.grain;
-      for (let i = 0; i < o.grain.n; i++) point(xs[i], zs[i], K.GRAIN * ws[i]);
+      const { xs, zs, ws, inWeld } = o.grain;
+      const m = o.mat;
+      const gB = m.grainBase ? m.grainBase.L : 1, gW = m.grainWeld ? m.grainWeld.L : 1;
+      for (let i = 0; i < o.grain.n; i++) point(xs[i], zs[i], K.GRAIN * ws[i] * (inWeld && inWeld[i] ? gW : gB));
     }
     return { re, tStart: o.tStart, tEnd: o.tEnd, n, bwPeak };
   };

@@ -89,6 +89,7 @@
 ${result}
 <div class="sign"><div>Pemeriksa</div><div>Penilai / instruktur</div></div>
 <p class="note">Dibuat dengan simulator edukasi. Model fisika disederhanakan; laporan ini bukan dokumen inspeksi resmi.</p>
+${d.record ? `<script type="application/json" id="ut-result">${UT.recordForHTML(d.record)}</script>` : ''}
 </body></html>`;
   };
 })(typeof window !== 'undefined' ? window : globalThis);

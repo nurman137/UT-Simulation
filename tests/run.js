@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
+['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
 const UT = globalThis.UT;
 const C = UT.CONFIG;
 
@@ -360,6 +360,93 @@ test('akuisisi progresif mengisi semua kolom', () => {
   const env = UT.envelopeBins(Float32Array.from([0, -3, 1, 2, 0, 0]), 2);
   assert.deepStrictEqual(Array.from(env), [3, 2]);
   assert.deepStrictEqual(Array.from(UT.signedBins(Float32Array.from([0, -3, 1, 2, 0, 0]), 2)), [-3, 2]);
+});
+
+console.log('Material, pipa, rekap (v0.5)');
+const peakDefect = (o) => {
+  // amplitudo cacat = selisih terhadap benda uji tanpa cacat (noise butir sama)
+  const spec = weldFor(Object.assign({ T: 20 }, o.spec));
+  let best = 0;
+  for (let x = o.x0; x <= o.x1; x += 1) {
+    const base = { probe: { x, y: 150, dir: 1, angle: 60, freq: 4, crystal: 10, wave: o.wave }, mat: C.material, T: 20, grain: spec.grain, spStart: 0, spEnd: 150, n: 2000, weld: spec.weld, coupling: o.coupling };
+    const a = UT.simulate(Object.assign({}, base, { scene: { points: spec.scene.points, corners: [] } }));
+    const b = UT.simulate(Object.assign({}, base, { scene: { points: [], corners: [] } }));
+    for (let i = 0; i < a.n; i++) best = Math.max(best, Math.abs(a.re[i] - b.re[i]));
+  }
+  return best;
+};
+test('austenitik: gelombang geser melewati las teredam jauh lebih kuat daripada LW', () => {
+  UT.setMaterial('ss');
+  try {
+    const sw = peakDefect({ spec: { scenario: 'lof-kanan' }, wave: 'T', x0: -100, x1: -27 });
+    const lw = peakDefect({ spec: { scenario: 'lof-kanan' }, wave: 'L', x0: -100, x1: -27 });
+    UT.setMaterial('cs');
+    const swCs = peakDefect({ spec: { scenario: 'lof-kanan' }, wave: 'T', x0: -100, x1: -27 });
+    assert.ok(20 * Math.log10(swCs / sw) > 6, `SW cs vs ss: ${swCs} / ${sw}`);
+    assert.ok(lw > sw, `LW ${lw} harus > SW ${sw} pada austenitik`);
+  } finally { UT.setMaterial('cs'); }
+});
+test('material aktif & kecepatan per mode gelombang', () => {
+  UT.setMaterial('ss');
+  assert.strictEqual(UT.waveV(C.material, 'L'), 5740);
+  assert.strictEqual(UT.waveV(C.material, 'T'), 3130);
+  UT.setMaterial('cs');
+  assert.strictEqual(C.material.vT, 3240);
+  assert.strictEqual(C.material.name, 'Baja karbon');
+});
+test('pipa: keliling = π·OD, cacat acak di dalam keliling, kopling lebih buruk untuk wedge datar', () => {
+  const spec = weldFor({ geom: 'pipa', OD: 114.3, scenario: 'acak', randSeed: 3, randCount: 4 });
+  near(spec.yLen, Math.PI * 114.3, 1e-9);
+  spec.scene.truth.forEach((t) => assert.ok(t.y2 <= spec.yLen - 20, `cacat melewati keliling ${t.y2}`));
+  const flat = UT.coupling(spec, false), cont = UT.coupling(spec, true);
+  assert.ok(flat.lossDb > cont.lossDb + 5, `${flat.lossDb} vs ${cont.lossDb}`);
+  assert.strictEqual(UT.coupling(weldFor({}), false).lossDb, 0, 'pelat datar tanpa rugi');
+  const aFlat = peakDefect({ spec: { geom: 'pipa', OD: 114.3, scenario: 'lof-kiri' }, wave: 'T', x0: -70, x1: -50, coupling: flat });
+  const aCont = peakDefect({ spec: { geom: 'pipa', OD: 114.3, scenario: 'lof-kiri' }, wave: 'T', x0: -70, x1: -50, coupling: cont });
+  assert.ok(aCont > 2 * aFlat, `kontur ${aCont} vs datar ${aFlat}`);
+});
+test('blok lengkung ASME berlaku untuk 0,9–1,5 × diameter blok', () => {
+  assert.ok(UT.curvedBlockOk(168.3, 168.3));
+  assert.ok(UT.curvedBlockOk(219.1, 168.3));
+  assert.ok(!UT.curvedBlockOk(323.9, 168.3));
+  assert.ok(!UT.curvedBlockOk(114.3, 168.3));
+  assert.ok(!UT.curvedBlockOk(114.3, null));
+});
+test('rekap: file hasil (JSON & HTML) terbaca, nilai dihitung ulang, perubahan nilai terdeteksi', () => {
+  const { ex, truth } = UT.examTruth(4321, 'sedang');
+  const rows = truth.map((d) => ({ y1: d.y1, y2: d.y2, depth: (d.z1 + d.z2) / 2, x: (d.x1 + d.x2) / 2, pctDAC: 150, type: d.type, verdict: UT.expectedVerdict(d, 150, ex.T), note: '' }));
+  const result = UT.gradeExam(truth, rows, { t: ex.T });
+  const rec = UT.buildResultRecord({ student: 'Ani', code: 4321, levelId: 'sedang', T: ex.T, date: 'd', elapsedMs: 61000, rows, result });
+  const back = UT.parseResultFile(JSON.stringify(rec));
+  const rg = UT.regradeRecord(back);
+  near(rg.result.score, 100, 1e-9);
+  assert.strictEqual(rg.status, 'cocok');
+  const html = '<html><body><script type="application/json" id="ut-result">' + UT.recordForHTML(rec) + '</script></body></html>';
+  assert.strictEqual(UT.parseResultFile(html).student, 'Ani');
+  const tampered = Object.assign({}, rec, { score: 100, rows: rows.slice(1) });
+  const rg2 = UT.regradeRecord(UT.parseResultFile(JSON.stringify(tampered)));
+  assert.strictEqual(rg2.status, 'berbeda');
+  assert.ok(rg2.result.score < 100);
+  assert.throws(() => UT.parseResultFile('{"type":"lain"}'));
+  assert.throws(() => UT.parseResultFile('<html>bukan hasil</html>'));
+});
+test('rekap: statistik kelas dan CSV', () => {
+  const mk = (name, drop) => {
+    const { ex, truth } = UT.examTruth(77, 'mudah');
+    const rows = drop ? [] : truth.map((d) => ({ y1: d.y1, y2: d.y2, depth: (d.z1 + d.z2) / 2, x: (d.x1 + d.x2) / 2, pctDAC: 150, type: d.type, verdict: UT.expectedVerdict(d, 150, ex.T) }));
+    const rec = UT.parseResultFile(JSON.stringify(UT.buildResultRecord({ student: name, code: 77, levelId: 'mudah', T: ex.T, date: 'd', elapsedMs: 90000, rows, result: UT.gradeExam(truth, rows, { t: ex.T }) })));
+    return { rec, regrade: UT.regradeRecord(rec) };
+  };
+  const ents = [mk('A; "x"', false), mk('B', true)];
+  const st = UT.summarizeClass(ents);
+  assert.strictEqual(st.n, 2);
+  near(st.mean, 50, 1e-9);
+  assert.strictEqual(st.found, 1);
+  assert.strictEqual(st.total, 2);
+  const csv = UT.classCSV(ents);
+  assert.ok(csv.startsWith('﻿Nama;Kode soal'));
+  assert.ok(csv.includes('"A; ""x"""'), 'nama dengan ; dan " di-escape');
+  assert.ok(csv.includes('1:30'));
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

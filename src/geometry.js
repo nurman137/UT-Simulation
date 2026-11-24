@@ -112,7 +112,7 @@
 
   /** Besaran turunan probe: panjang gelombang, near field, sudut sebar berkas. */
   UT.probeDerived = function (probe, mat) {
-    const lambda = mat.vT / (probe.freq * 1000); // mm
+    const lambda = UT.waveV(mat, probe.wave) / (probe.freq * 1000); // mm
     const D = probe.crystal;
     const N = (D * D) / (4 * lambda); // panjang near field (pendekatan, di baja)
     const gamma6 = Math.asin(Math.min(0.99, (0.51 * lambda) / D)); // setengah sudut -6 dB

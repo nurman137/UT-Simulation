@@ -40,11 +40,17 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Bevel X (V ganda) dan U
 - [ ] Fokus elektronik & delay law Phased Array, scan linear (E-scan) — ditunda
 
-## v0.5 – Rencana
-- [ ] Geometri pipa (las girth): permukaan lengkung, koreksi jarak permukaan
-- [ ] Material austenitik: noise butir tinggi, atenuasi besar, pembelokan berkas sederhana
-- [ ] Rekap nilai ujian satu kelas (perlu penyimpanan bersama)
-- [ ] Pilihan acuan lain (AWS D1.1 / ISO 11666) untuk evaluasi
+## v0.5 – Pipa, austenitik, rekap kelas ✅
+- [x] Pipa las girth: OD, keliling & posisi jam, wrap-around, inset penampang pipa
+- [x] Wedge datar vs dikontur (rugi kopling, penyebaran berkas searah keliling)
+- [x] Blok kalibrasi ASME lengkung + peringatan validitas DAC (0,9–1,5 × D, D ≤ 508 mm)
+- [x] Material baja tahan karat austenitik (noise & atenuasi logam las, atenuasi lintasan dalam las)
+- [x] Mode gelombang probe sudut SW/LW
+- [x] Rekap kelas: file hasil .json / laporan .html, penilaian ulang, statistik, deteksi per jenis, CSV
+- [ ] Las memanjang (seam) pada pipa: berkas di bidang lengkung (ray tracing anulus) — ditunda
+- [ ] Pembelokan berkas (beam skewing) di las austenitik anisotropik — ditunda
+- [ ] Acuan AWS D1.1 / ISO 11666 — perlu tabel kriteria dari dokumen standar resmi
+- [ ] Rekap kelas daring (penyimpanan bersama antar perangkat) — perlu server/hosting
 
 ## v1.0
 - [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III

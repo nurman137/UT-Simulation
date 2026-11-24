@@ -181,7 +181,7 @@
    * Cacat acak yang dapat diulang dari kode (seed). Las dibagi menjadi beberapa zona
    * sepanjang sumbu las; setiap zona berisi satu cacat dengan jenis, posisi, dan ukuran acak.
    */
-  UT.randomDefects = function (w, seed, count) {
+  UT.randomDefects = function (w, seed, count, yLen) {
     const rnd = UT.rng(seed);
     const R = (a, b) => a + rnd() * (b - a);
     const pool = ['lof', 'ip', 'porositas', 'slag', 'crack', 'root-crack'].filter((t) => !(w.type === 'X' && t === 'root-crack'));
@@ -191,7 +191,7 @@
     }
     const n = Math.max(1, Math.min(4, count || 1));
     const types = pool.slice(0, n);
-    const y0 = 30, y1z = UT.CONFIG.weldLength - 30;
+    const y0 = 30, y1z = (yLen || UT.CONFIG.weldLength) - 30;
     const zw = (y1z - y0) / n;
     const T = w.T, rfTop = T - w.rf;
     const parts = types.map((t, i) => {
@@ -313,7 +313,7 @@
       id: 'acak',
       name: 'Acak (latihan, bisa diulang dengan kode)',
       desc: 'Cacat acak sepanjang las. Jenis, posisi, dan ukurannya ditentukan oleh kode soal sehingga bisa diulang atau dibagikan.',
-      build: (w, opt) => UT.randomDefects(w, (opt && opt.seed) || 1, (opt && opt.count) || 2),
+      build: (w, opt) => UT.randomDefects(w, (opt && opt.seed) || 1, (opt && opt.count) || 2, opt && opt.yLen),
     },
   ];
 
@@ -356,7 +356,7 @@
     const rootBead = w.rootH > 0;
     if (rootBead) {
       const s = 0.7 * w.rootH;
-      const segs = res.ipRanges.length ? complementRanges(UT.CONFIG.weldLength, res.ipRanges) : [{ y1: null, y2: null }];
+      const segs = res.ipRanges.length ? complementRanges((opt && opt.yLen) || UT.CONFIG.weldLength, res.ipRanges) : [{ y1: null, y2: null }];
       segs.forEach((g) => {
         const yr = g.y1 == null ? {} : { y1: g.y1, y2: g.y2 };
         corners.push(Object.assign({ x: w.rootHalf, z: w.T, s, face: -1, kind: 'geo' }, yr));
