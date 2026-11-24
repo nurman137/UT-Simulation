@@ -17,6 +17,29 @@
     maxA: 70,
     step: 1,
   };
+  UT.PAUT.total = 64; // jumlah elemen probe untuk E-scan (aperture aktif 16 elemen digeser)
+  UT.PAUT.eBeams = UT.PAUT.total - UT.PAUT.elements + 1;
+  /** Pergeseran exit point berkas E-scan ke-i terhadap pusat probe (mm). */
+  UT.escanOffset = (i) => (i - (UT.PAUT.eBeams - 1) / 2) * UT.PAUT.pitch;
+
+  /**
+   * Delay law (ns) untuk aperture aktif: berkas dibelokkan ke sudut θ dan (opsional) difokuskan
+   * pada jarak F sepanjang berkas. Disederhanakan: elemen dianggap langsung di permukaan baja (v).
+   */
+  UT.delayLaw = function (angle, F, v) {
+    const n = UT.PAUT.elements, p = UT.PAUT.pitch, th = angle * DEG, vv = v / 1e6; // mm/ns
+    const xs = Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * p);
+    let L;
+    if (F) {
+      const xf = F * Math.sin(th), zf = F * Math.cos(th);
+      L = xs.map((x) => Math.hypot(xf - x, zf));
+    } else {
+      L = xs.map((x) => -x * Math.sin(th)); // muka gelombang datar
+    }
+    const mx = Math.max(...L);
+    return L.map((l) => (mx - l) / vv);
+  };
+
   UT.pautAngles = () => {
     const a = [];
     for (let x = UT.PAUT.minA; x <= UT.PAUT.maxA + 1e-9; x += UT.PAUT.step) a.push(x);

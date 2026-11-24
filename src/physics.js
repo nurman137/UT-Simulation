@@ -89,6 +89,9 @@
     const wAtt = opts.weld && mat.weldAtt ? mat.weldAtt[wave] : 0;
     const wK = (-wAtt * 2 * Math.LN10) / 20;
     const wW = opts.weld;
+    // Fokus elektronik (Phased Array): hanya efektif di dalam near field
+    const focF = probe.focus && probe.focus < 0.95 * N0 ? probe.focus : null;
+    const wFoc = focF ? (0.51 * d.lambda * focF) / probe.crystal : 0;
     const coup = opts.coupling || { gain: 1, yScale: 1 };
     const shadows = opts.shadows || [];
     const yS = coup.yScale || 1;
@@ -105,7 +108,9 @@
     const dsp = (spEnd - spStart) / (n - 1);
     const maxLeg = Math.min(12, Math.ceil(((spEnd + win) * Math.cos(Math.max(0, th - 4 * d.gamma6))) / T) + 1);
 
+    const dualP = probe.dual && Math.abs(probe.angle) < 1 && UT.dualGain;
     function add(r, a) {
+      if (dualP && r > 0) { a *= UT.dualGain(r); r = UT.dualPath(r); }
       if (r + win < spStart || r - win > spEnd) return;
       let j0 = Math.ceil((r - win - spStart) / dsp);
       let j1 = Math.floor((r + win - spStart) / dsp);
@@ -126,12 +131,19 @@
       const perp = dxh * cs - zu * sn;
       const wr = along * tg;
       const w6sq = w0 * w0 + wr * wr;
-      const q2 = (perp * perp) / w6sq;
+      let q2 = (perp * perp) / w6sq, fg = 1;
+      if (focF) {
+        // bidang aktif terfokus: lebar mengecil di sekitar F, energi terkonsentrasi (2 arah: wU/wF)
+        const u = w0 * (1 - along / focF);
+        const wfsq = wFoc * wFoc + u * u;
+        q2 = (perp * perp) / wfsq;
+        fg = Math.sqrt(w6sq / wfsq);
+      }
       if (q2 > 14) return 0;
       const r = Math.sqrt(dxh * dxh + zu * zu);
       bR = r; bDx = dxh; bW6 = Math.sqrt(w6sq) * yS;
       const spread = Math.pow(N0 / Math.sqrt(N0 * N0 + r * r), 1.5);
-      let a = Math.pow(0.5, q2) * spread * Math.exp(attK * r);
+      let a = Math.pow(0.5, q2) * spread * fg * Math.exp(attK * r);
       if (wAtt > 0) a *= Math.exp(wK * weldLen(x, zu, r));
       if (shadows.length) a *= shadowFactor(x, zu);
       return a;
@@ -258,12 +270,12 @@
       const mb = opts.mainBangSP;
       if (mb - win < spEnd) {
         const j0 = Math.max(0, Math.ceil((mb - win - spStart) / dsp));
-        const ring = 2.4 * halfLambda; // panjang ringing → dead zone beberapa mm
+        const ring = (dualP ? 0.8 : 2.4) * halfLambda; // panjang ringing → dead zone beberapa mm (dual: hampir tanpa dead zone)
         const j1 = Math.min(n - 1, Math.floor((mb + ring * 8 - spStart) / dsp));
         for (let j = j0; j <= j1; j++) {
           const u = spStart + j * dsp - mb;
           const env = u < 0 ? Math.exp(-u * u * invTau2) : Math.exp(-u / ring);
-          re[j] += 20 * env * Math.cos(kw * u);
+          re[j] += (dualP ? UT.DUAL.crosstalk : 20) * env * Math.cos(kw * u);
         }
       }
       // gema wedge (lemah, acak tetap) antara pulsa awal dan permukaan

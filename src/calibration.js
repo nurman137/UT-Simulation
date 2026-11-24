@@ -26,10 +26,12 @@
   };
 
   /** Buat kebenaran probe. random = fungsi acak [0,1) atau null untuk probe ideal. */
-  UT.makeProbeTruth = function (angle, random) {
+  UT.makeProbeTruth = function (angle, random, opt) {
     // Probe lurus 0°: exit point di tengah badan probe
     const front = angle === 0 ? UT.PROBE_BODY / 2 : UT.CONFIG.wedge.front;
-    const zero = UT.nominalZero(angle);
+    // probe dual (TR): delay line perspex → zero jauh lebih besar
+    const dual = angle === 0 && opt && opt.dual;
+    const zero = dual ? (2 * (UT.DUAL ? UT.DUAL.delayPath : 9)) / (UT.V_WEDGE / 1000) : UT.nominalZero(angle);
     if (!random) return { front, angle, zero };
     const sym = () => random() * 2 - 1;
     if (angle === 0) {

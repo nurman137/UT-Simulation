@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.7.0',
+    version: '0.8.0',
 
     // Material aktif (objek ini diperbarui oleh UT.setMaterial; referensinya tetap sama)
     material: {},
@@ -55,6 +55,12 @@
 
     defaults: {
       specimen: 'las',
+      dual: false,
+      seam: false,
+      aniso: true,
+      korosiSeed: 2468,
+      code: 'asme',
+      awsB: null,
       plan: { on: false, angles: [60], sides: 'keduanya', legs: 2, near: null, far: null, haz: 6 },
       orient: 'tegak',
       iiwFace: 'A',
@@ -67,6 +73,10 @@
       asmeCurved: false,
       technique: 'ut',
       pautAngle: 60,
+      pautMode: 'S', // 'S' = sektoral, 'E' = linear
+      pautEAngle: 60,
+      pautBeam: 24,
+      pautFocus: 0, // kedalaman fokus (mm), 0 = tanpa fokus
       tofdS: null,
       bevelType: 'V',
       probeY: 150,

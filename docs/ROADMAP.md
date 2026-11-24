@@ -39,7 +39,7 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Phased Array S-scan 40–70° (16 elemen, 5 MHz) + A-scan per sudut
 - [x] TOFD: gelombang lateral, back wall, difraksi ujung dengan fase benar, D-scan, sizing tinggi
 - [x] Bevel X (V ganda) dan U
-- [ ] Fokus elektronik & delay law Phased Array, scan linear (E-scan) — ditunda
+- [x] Fokus elektronik & delay law Phased Array, scan linear (E-scan) — selesai di v0.8
 
 ## v0.5 – Pipa, austenitik, rekap kelas ✅
 - [x] Pipa las girth: OD, keliling & posisi jam, wrap-around, inset penampang pipa
@@ -48,9 +48,9 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Material baja tahan karat austenitik (noise & atenuasi logam las, atenuasi lintasan dalam las)
 - [x] Mode gelombang probe sudut SW/LW
 - [x] Rekap kelas: file hasil .json / laporan .html, penilaian ulang, statistik, deteksi per jenis, CSV
-- [ ] Las memanjang (seam) pada pipa: berkas di bidang lengkung (ray tracing anulus) — ditunda
-- [ ] Pembelokan berkas (beam skewing) di las austenitik anisotropik — ditunda
-- [ ] Acuan AWS D1.1 / ISO 11666 — perlu tabel kriteria dari dokumen standar resmi
+- [x] Las memanjang (seam) pada pipa — selesai di v0.8
+- [x] Pembelokan berkas (beam skewing) di las austenitik anisotropik — selesai di v0.8 (model sederhana)
+- [x] Acuan AWS D1.1 — v0.8 (tabel edukasi); ISO 11666 belum
 - [ ] Rekap kelas daring (penyimpanan bersama antar perangkat) — perlu server/hosting
 
 ## v0.6 – Cacat melintang, scan sejajar, TCG ✅
@@ -66,7 +66,17 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Rencana scan & peta cakupan zona las + HAZ (sudut, sisi, leg, jarak gerak probe)
 - [x] Mode offline / dapat dipasang (PWA)
 - [x] Tutorial 10–11
-- [ ] Probe dual-element (TR) 0° — ditunda
+- [x] Probe dual-element (TR) 0° — selesai di v0.8
+
+## v0.8 – Ujian praktik, AWS, PAUT lanjutan, korosi, pipa seam, anisotropi, bahasa Inggris ✅
+- [x] Ujian praktik lengkap (proses kalibrasi, DAC, gain scanning ikut dinilai; rekap kelas)
+- [x] Evaluasi AWS D1.1 (rating d = a − b − c, kelas A–D) – tabel perlu dicocokkan dengan dokumen resmi
+- [x] Phased Array: fokus elektronik, delay law, E-scan
+- [x] Probe dual (TR) 0°, pelat korosi, C-scan peta tebal
+- [x] Las memanjang (seam) pada pipa: lintasan berkas di anulus
+- [x] Pembelokan berkas di las austenitik anisotropik (model sederhana)
+- [x] Tampilan bahasa Inggris
+- [x] Tutorial 12–15
 
 ## v1.0
 - [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III

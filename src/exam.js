@@ -14,7 +14,63 @@
       desc: '2 cacat · probe ideal · buat DAC sendiri di blok kalibrasi ASME.' },
     { id: 'sulit', name: 'Sulit', count: 3, training: true, autoDac: false,
       desc: '3 cacat · probe harus dikalibrasi di blok IIW · buat DAC sendiri.' },
+    { id: 'praktik', name: 'Praktik lengkap', count: 2, training: true, autoDac: false, process: true,
+      desc: '2 cacat · alur lengkap seperti ujian praktik: kalibrasi probe, DAC, gain scanning, scan, laporan. Proses ikut dinilai (30%).' },
   ];
+
+  /** Probe ujian praktik: galat tersembunyi ditentukan oleh kode soal (bisa dinilai ulang). */
+  UT.examProbeTruth = (code, angle) => UT.makeProbeTruth(angle || 60, UT.rng((code * 104729) ^ 0x3c3c));
+
+  /**
+   * Nilai proses ujian praktik (0–100):
+   *   kalibrasi 40 (X-value, sudut, zero, velocity @10), DAC 40 (jumlah titik 10, ketepatan 30),
+   *   gain scanning 20 (reference level DAC sebenarnya + 6 dB).
+   * o: { H, user:{xValue, angle, zero, velocity}, vTrue, dacPoints, gain, T, freq, crystal, trueDac? }
+   */
+  UT.gradeProcess = function (o) {
+    const H = o.H, u = o.user, notes = [];
+    const parts = { kalibrasi: 0, dac: 0, gain: 0 };
+    const ex = Math.abs(u.xValue - H.front), ea = Math.abs(u.angle - H.angle);
+    const ez = Math.abs(u.zero - H.zero) * (o.vTrue / 2000), ev = Math.abs(u.velocity - o.vTrue) / o.vTrue;
+    const k = [lin(ex, 1, 4), lin(ea, 1.5, 5), lin(ez, 0.6, 3), lin(ev, 0.01, 0.05)];
+    if (H.angle === 0) { k[0] = 1; k[1] = 1; }
+    parts.kalibrasi = 10 * (k[0] + k[1] + k[2] + k[3]);
+    if (k[0] < 1) notes.push(`X-value ${u.xValue} (sebenarnya ${H.front})`);
+    if (k[1] < 1) notes.push(`sudut ${u.angle}° (sebenarnya ${H.angle}°)`);
+    if (k[2] < 1) notes.push(`zero meleset ≈ ${ez.toFixed(1)} mm SP`);
+    if (k[3] < 1) notes.push(`velocity ${u.velocity} m/s (sebenarnya ${o.vTrue})`);
+    const cal = { vTrue: o.vTrue, vUser: u.velocity, zeroTrue: H.zero, zeroUser: u.zero };
+    const trueDac = o.trueDac || UT.autoDac({ T: o.T, H, freq: o.freq, crystal: o.crystal, cal });
+    const user = { points: (o.dacPoints || []).slice().sort((a, b) => a.sp - b.sp) };
+    const n = user.points.length;
+    let acc = 0;
+    if (n >= 2 && trueDac.points.length) {
+      let sum = 0, cnt = 0;
+      trueDac.points.forEach((p) => {
+        const a = UT.dacAt(user, p.sp, 0);
+        if (a == null) return; // hanya dinilai di rentang DAC siswa
+        sum += Math.abs(20 * Math.log10(a) - p.db);
+        cnt++;
+      });
+      const covered = cnt / trueDac.points.length;
+      const err = cnt ? sum / cnt : 99;
+      acc = lin(err, 1.5, 6) * Math.min(1, covered / 0.6);
+      if (err > 1.5) notes.push(`kurva DAC meleset rata-rata ${err.toFixed(1)} dB`);
+      if (covered < 0.6) notes.push('DAC tidak mencakup rentang leg 1–2');
+    } else notes.push('DAC tidak dibuat (minimal 2 titik)');
+    parts.dac = 10 * Math.min(1, n / 3) + 30 * acc;
+    const ref = UT.dacRefGain(trueDac);
+    if (ref != null && o.gain != null) {
+      const eg = Math.abs(o.gain - (ref + 6));
+      parts.gain = 20 * lin(eg, 1.5, 6);
+      if (eg > 1.5) notes.push(`gain scanning ${o.gain} dB (seharusnya ≈ ${(ref + 6).toFixed(1)} dB)`);
+    }
+    const score = parts.kalibrasi + parts.dac + parts.gain;
+    return { score, parts, notes };
+  };
+
+  /** Nilai akhir ujian praktik: 70% laporan + 30% proses. */
+  UT.combineScore = (report, proc) => (proc ? 0.7 * report.score + 0.3 * proc.score : report.score);
 
   /** Parameter soal dari kode (seed) dan tingkat kesulitan. */
   UT.makeExam = function (seed, levelId) {

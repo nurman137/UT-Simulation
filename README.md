@@ -16,6 +16,23 @@ berkas (`file://`) aplikasi juga jalan, tetapi tanpa fitur pasang/offline otomat
 
 ## Fitur
 
+### v0.8 – Ujian praktik, AWS D1.1, PAUT lanjutan, korosi, pipa seam, anisotropi, bahasa Inggris
+- **Ujian praktik lengkap**: probe dengan galat tersembunyi (ditentukan kode soal), kalibrasi, DAC, gain scanning,
+  scan, dan laporan. Nilai akhir = 70% laporan + 30% proses (kalibrasi 40, DAC 40, gain scanning 20); proses ikut
+  dinilai ulang di Rekap kelas.
+- **Evaluasi AWS D1.1** (struktur, beban statis) sebagai alternatif ASME: reference level b dari lubang Ø1,5 mm blok
+  IIW sisi B, faktor atenuasi c, rating d = a − b − c, kelas A–D dan batas panjang. *Tabel disusun untuk edukasi;
+  cocokkan dengan edisi AWS D1.1 yang berlaku.*
+- **Phased Array**: fokus elektronik (efektif hanya di dalam near field), grafik delay law, dan **E-scan** (64 elemen,
+  aperture 16 elemen digeser).
+- **Probe dual (TR) 0°** dan **pelat korosi**: korosi umum + pit, dead zone pendek, galat lintasan-V, dan
+  **C-scan peta tebal**.
+- **Las memanjang (seam) pada pipa**: berkas di penampang keliling (anulus) dengan pantulan di dinding lengkung,
+  batas sudut sin θ ≤ Ri/Ro, koreksi lengkung pada pembacaan alat.
+- **Anisotropi las austenitik**: berkas berbelok mengikuti butir kolumnar; lintasan sebenarnya vs asumsi alat.
+- **Bahasa Inggris** (tombol EN/ID di kanan atas), termasuk tutorial, kanvas, dialog, dan laporan.
+- **Tutorial 12–15**: korosi & probe dual, PAUT fokus & E-scan, pipa seam & anisotropi, AWS D1.1.
+
 ### v0.7 – Probe lurus 0°, laminasi, rencana scan, mode offline
 - **Probe lurus 0°** (gelombang longitudinal): echo back wall T, 2T, 3T…, pengukuran tebal, kalibrasi cukup zero & velocity.
 - **Laminasi di logam induk**: echo berulang sebelum back wall dan back wall hilang. Laminasi juga **membayangi berkas
@@ -146,6 +163,9 @@ berkas (`file://`) aplikasi juga jalan, tetapi tanpa fitur pasang/offline otomat
 | Waktu alat | t = 2·SP/v + zero (wedge). Pembacaan alat memakai velocity dan zero yang dimasukkan pengguna |
 | Phased Array | Setiap sudut sektor disimulasikan sebagai berkas dengan aperture array (9,6 mm) dari exit point yang sama. Fokus elektronik belum dimodelkan |
 | Probe lurus & laminasi | Back wall sebagai pemantul datar di T, 2T, …; laminasi = reflektor datar dua sisi dengan echo ulang, dan daerah bayangan yang melemahkan berkas yang melewatinya |
+| Lintasan umum | Sumbu berkas sebagai polyline (pantulan di dinding lengkung pipa, pembelokan di las austenitik); amplitudo dihitung per segmen dengan model berkas yang sama |
+| Fokus PAUT | Lebar berkas di bidang aktif menyempit menuju batas difraksi di jarak fokus (bila < near field); energi terkonsentrasi menaikkan amplitudo |
+| Korosi & probe dual | Telapak berkas pada permukaan bawah disampling; tiap titik memantul sesuai tebal dan kemiringan. Probe dual: sensitivitas menurut kedalaman, crosstalk kecil, galat lintasan-V |
 | Cakupan scan | Geometris: titik zona tercakup bila berada dalam lebar berkas −6 dB untuk salah satu posisi probe di rentang jarak yang dipilih (leg 1/2) |
 | TOFD | Pitch-catch gelombang longitudinal (5920 m/s). Back wall dan cacat dijumlahkan sebagai titik hambur Huygens, sehingga difraksi ujung dan fasenya muncul dari interferensi. Lateral wave = fraksi tetap dari back wall |
 
@@ -165,6 +185,10 @@ src/calibration.js      kebenaran probe tersembunyi, pemetaan zero/velocity, X-v
 src/dac.js              DAC, reference level, evaluasi ASME App. 12
 src/exam.js             soal acak, DAC otomatis, penilaian ujian
 src/scanplan.js         rencana scan: peta cakupan zona las + HAZ, jarak skip
+src/raypath.js          lintasan berkas umum: pipa seam (anulus), pembelokan berkas las austenitik
+src/corrosion.js        pelat korosi, probe dual (TR), A-scan permukaan bawah tidak rata, tebal echo pertama
+src/i18n.js             pilihan bahasa (kamus, pola, frasa; DOM, kanvas, dialog, laporan)
+src/i18n-lessons-en.js  terjemahan Inggris pelajaran tutorial
 src/imaging.js          B-scan, S-scan Phased Array, simulasi TOFD, akuisisi progresif
 src/render-images.js    gambar B-scan/D-scan dan sektor S-scan
 src/report.js           laporan inspeksi HTML (cetak/PDF/unduh)

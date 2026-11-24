@@ -20,6 +20,7 @@
     { id: 'iiw', name: 'Blok IIW V1' },
     { id: 'v2', name: 'Blok V2' },
     { id: 'asme', name: 'Blok kalibrasi dasar ASME' },
+    { id: 'korosi', name: 'Pelat korosi' },
   ];
 
   // Blok IIW V1 (ISO 2400 / EN 12223), 300 × 100 mm. Posisi lubang diturunkan dari skala sudut
@@ -91,17 +92,23 @@
   }
 
   /** Panjang las searah sumbu las: keliling pipa (las girth) atau panjang pelat. */
-  UT.weldYLen = (S) => (S.geom === 'pipa' ? Math.PI * S.OD : UT.CONFIG.weldLength);
+  UT.weldYLen = (S) => (S.geom === 'pipa' && !S.seam ? Math.PI * S.OD : UT.CONFIG.weldLength);
 
   function buildWeldSpecimen(S) {
     const weld = UT.buildWeld(S);
     const yLen = UT.weldYLen(S);
-    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen, gen: S.randGen || 2, pipe: S.geom === 'pipa' });
+    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen, gen: S.randGen || 2, pipe: S.geom === 'pipa' && !S.seam });
     const spec = {
       type: 'las', name: 'Las', T: weld.T, xMin: -weld.P, xMax: weld.P,
       yLen, weld, scene,
     };
-    if (S.geom === 'pipa') {
+    if (S.geom === 'pipa' && S.seam) {
+      // Las memanjang (seam): bidang berkas = penampang keliling (anulus); las sejajar sumbu pipa (y)
+      spec.seam = true;
+      spec.OD = S.OD;
+      spec.R = S.OD / 2;
+      spec.name = `Pipa OD ${S.OD} mm – las memanjang (seam)`;
+    } else if (S.geom === 'pipa') {
       // Las girth: bidang berkas = penampang aksial dinding pipa (datar); kelengkungan ada searah keliling (y)
       spec.isPipe = true;
       spec.OD = S.OD;
@@ -276,7 +283,8 @@
    */
   UT.coupling = function (spec, contoured) {
     if (!spec || !spec.R) return { gain: 1, yScale: 1, lossDb: 0, gap: 0 };
-    const W = UT.PROBE_WIDTH || 20;
+    // girth: kelengkungan melintang lebar wedge; seam: kelengkungan searah panjang wedge
+    const W = spec.seam ? UT.PROBE_BODY : UT.PROBE_WIDTH || 20;
     const h = (W * W) / (8 * spec.R);
     const lossDb = contoured ? 0.5 : Math.min(18, 10 * h);
     const yScale = contoured ? 1 + 0.5 * h : 1 + 4 * h;
@@ -317,7 +325,7 @@
 
   /** Apakah dasar benda uji di bawah posisi x rata (untuk echo back wall probe 0°). */
   UT.flatBottomFn = function (spec) {
-    if (spec.type === 'par' || spec.type === 'asme') return () => true;
+    if (spec.type === 'par' || spec.type === 'asme' || spec.type === 'korosi') return () => true;
     if (spec.type === 'v2') return () => false;
     if (spec.type === 'iiw') return spec.face === 'B' ? () => true : (x) => x <= UT.IIW.r100.cx;
     const w = spec.weld;
@@ -329,6 +337,7 @@
     if (S.specimen === 'iiw') return buildIIW(S.iiwFace);
     if (S.specimen === 'v2') return buildV2(S.v2Face);
     if (S.specimen === 'asme') return buildASME(S.T, S.asmeCurved ? S.OD : null);
+    if (S.specimen === 'korosi') return UT.buildKorosi(S.T, S.korosiSeed || 2468);
     return buildWeldSpecimen(S);
   };
 })(typeof window !== 'undefined' ? window : globalThis);

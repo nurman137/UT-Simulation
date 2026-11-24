@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap', 'scanplan'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
+['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap', 'scanplan', 'corrosion', 'raypath', 'tutorial', 'i18n-lessons-en'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
 const UT = globalThis.UT;
 const C = UT.CONFIG;
 
@@ -649,6 +649,109 @@ test('service worker memuat semua skrip yang dipakai index.html', () => {
   assert.ok(srcs.length > 10);
   srcs.concat(['css/style.css', 'manifest.webmanifest']).forEach((f) => assert.ok(sw.includes(`'./${f}'`) || sw.includes(`"./${f}"`), `${f} ada di cache`));
   assert.ok(sw.includes(`ut-sim-v${C.version}`), 'nama cache mengikuti versi');
+});
+
+// ---- v0.8
+test('ujian praktik: proses sempurna = 100, proses buruk jauh lebih rendah; dinilai ulang dari file', () => {
+  const H = UT.examProbeTruth(4321, 60);
+  const cal = { vTrue: 3240, vUser: 3240, zeroTrue: H.zero, zeroUser: H.zero };
+  const td = UT.autoDac({ T: 20, H, freq: 4, crystal: 10, cal });
+  const good = { H, user: { xValue: H.front, angle: H.angle, zero: H.zero, velocity: 3240 }, vTrue: 3240, dacPoints: td.points, gain: UT.dacRefGain(td) + 6, T: 20, freq: 4, crystal: 10, trueDac: td };
+  near(UT.gradeProcess(good).score, 100, 0.01);
+  const bad = Object.assign({}, good, { user: { xValue: 10, angle: 60, zero: UT.nominalZero(60), velocity: 3240 }, dacPoints: [], gain: 40 });
+  assert.ok(UT.gradeProcess(bad).score < 45);
+  const rec = UT.buildResultRecord({ student: 'x', code: 4321, levelId: 'praktik', T: 20, gen: 2, rows: [], result: { score: 30 }, process: good });
+  const rg = UT.regradeRecord(UT.parseResultFile(JSON.stringify(rec)));
+  near(rg.result.process.score, 100, 0.01);
+  near(rg.result.score, 30, 0.01, '70% laporan (0) + 30% proses');
+});
+test('AWS D1.1: rating d = a − b − c dan kelas', () => {
+  assert.strictEqual(UT.awsAttenuation(25.4), 0);
+  assert.strictEqual(UT.awsAttenuation(76.2), 4);
+  const r = UT.evaluateAWS({ a: 50, b: 50, sp: 50.8, t: 20, angle: 70, length: null, depth: 10 });
+  assert.strictEqual(r.d, -2);
+  assert.strictEqual(r.cls, 'A');
+  assert.strictEqual(r.verdict, 'tolak');
+  const d = UT.evaluateAWS({ a: 62, b: 50, sp: 25, t: 20, angle: 70, length: 100, depth: 10 });
+  assert.strictEqual(d.cls, 'D');
+  assert.strictEqual(d.verdict, 'terima');
+  const c = UT.evaluateAWS({ a: 57, b: 50, sp: 25, t: 16, angle: 70, length: 30, depth: 8 });
+  assert.strictEqual(c.cls, 'C');
+  assert.strictEqual(c.verdict, 'terima', 'C di setengah tengah: batas 50 mm');
+  assert.strictEqual(UT.evaluateAWS({ a: 57, b: 50, sp: 25, t: 16, angle: 60, length: 30, depth: 8 }).verdict, 'nodac', '60° tidak ada di tabel untuk 16 mm');
+});
+test('PAUT: fokus di dalam near field menaikkan amplitudo & mempersempit berkas; di luar tidak berpengaruh', () => {
+  const sp = UT.buildSpecimen(Object.assign({}, C.defaults, { specimen: 'asme', T: 40 }));
+  const h = sp.holes[0], th = Math.PI / 3, sc = { points: sp.scene.points, corners: [] };
+  const run = (F) => {
+    let best = 0, n6 = 0;
+    const prof = [];
+    for (let x = h.x - h.z * Math.tan(th) - 10; x <= h.x - h.z * Math.tan(th) + 10; x += 0.25) {
+      const s = UT.simulate({ probe: { x, dir: 1, angle: 60, freq: 5, crystal: 9.6, focus: F ? F / Math.cos(th) : null }, mat: C.material, T: 40, scene: sc, grain: null, spStart: h.z / Math.cos(th) - 4, spEnd: h.z / Math.cos(th) + 4, n: 500 });
+      let m = 0; for (const v of s.re) m = Math.max(m, Math.abs(v));
+      prof.push(m); best = Math.max(best, m);
+    }
+    prof.forEach((v) => { if (v >= best / 2) n6++; });
+    return { best, n6 };
+  };
+  const u = run(null), f = run(10), far = run(40);
+  assert.ok(20 * Math.log10(f.best / u.best) > 4, 'naik > 4 dB');
+  assert.ok(f.n6 < u.n6, 'lebih sempit');
+  near(far.best, u.best, 1e-6, 'fokus di luar near field');
+  const dl = UT.delayLaw(60, null, 3240), dlf = UT.delayLaw(60, 20, 3240);
+  assert.strictEqual(dl.length, 16);
+  assert.ok(dl[15] > dl[0] && Math.abs(dl[1] - dl[0] - (dl[2] - dl[1])) < 1e-6, 'tanpa fokus: linear');
+  assert.ok(Math.abs(dlf[1] - dlf[0] - (dlf[15] - dlf[14])) > 1, 'fokus: melengkung');
+});
+test('korosi: probe tunggal mengukur tebal sisa; probe dual punya galat lintasan-V dan dead zone pendek', () => {
+  const sp = UT.buildKorosi(12, 2468);
+  const f = sp.features[0];
+  const gl = C.GAIN_K * Math.pow(10, 32 / 20);
+  const meas = (x, y, dual) => {
+    const s = UT.simulateStraight({ probe: { x, y, freq: 5, crystal: 10, dual }, spec: sp, mat: C.material, spStart: 0, spEnd: 30, n: 3000 });
+    return UT.firstEchoSP(s.re, gl, (i) => (i * 30) / 2999, 1.5, 14, 20);
+  };
+  near(meas(20, 20, false), 12, 0.15, 'tebal nominal');
+  near(meas(f.x - 12, f.y, false), sp.thick(f.x - 12, f.y), 0.25, 'tebal sisa');
+  assert.ok(meas(20, 20, true) > 12.05, 'galat lintasan-V');
+  near(UT.dualPath(2) - 2, Math.sqrt(4 + UT.DUAL.s ** 2) - 2, 1e-9);
+  // main bang probe dual jauh lebih kecil
+  const mb = (dual) => { const s = UT.simulateStraight({ probe: { x: 20, y: 20, freq: 5, crystal: 10, dual }, spec: sp, mat: C.material, spStart: 0, spEnd: 6, n: 600, mainBangSP: -2 }); let m = 0; for (let i = 100; i < 300; i++) m = Math.max(m, Math.abs(s.re[i])); return m; };
+  assert.ok(mb(true) < 0.1 * mb(false));
+});
+test('lintasan umum: tanpa pembelokan sama dengan mesin pelat; anisotropi membelokkan berkas di las', () => {
+  const sp = weldFor({ scenario: 'lof-kiri', T: 20 });
+  const sc = { points: sp.scene.points, corners: sp.scene.corners };
+  const a = UT.simulate({ probe: { x: -60, y: 150, dir: 1, angle: 60, freq: 4, crystal: 10 }, mat: C.material, T: 20, scene: sc, grain: null, spStart: 20, spEnd: 100, n: 2000 });
+  const b = UT.simulatePath({ probe: { freq: 4, crystal: 10, y: 150 }, mat: C.material, path: UT.tracePlate({ x0: -60, dir: 1, angle: 60, T: 20, spMax: 110 }), scene: sc, grain: null, spStart: 20, spEnd: 100, n: 2000 });
+  near(peakOf(b).amp, peakOf(a).amp, 1e-4 * peakOf(a).amp + 1e-9);
+  const p0 = UT.tracePlate({ x0: -18, dir: 1, angle: 60, T: 20, spMax: 60, weld: sp.weld, skew: 0 });
+  const p1 = UT.tracePlate({ x0: -18, dir: 1, angle: 60, T: 20, spMax: 60, weld: sp.weld, skew: 18 });
+  const e0 = UT.pathPoint(p0, 50), e1 = UT.pathPoint(p1, 50);
+  assert.ok(Math.hypot(e0.x - e1.x, e0.z - e1.z) > 2, 'berkas bergeser');
+});
+test('pipa seam: batas sudut sin θ ≤ Ri/Ro, pemetaan anulus bolak-balik, lokasi dengan koreksi lengkung', () => {
+  const Ro = 219.1 / 2, T = 20, aMax = Math.asin((Ro - T) / Ro) * 180 / Math.PI;
+  assert.ok(UT.tracePipe({ Ro, T, x0: 0, dir: 1, angle: aMax - 2, spMax: 300 }).hitsID);
+  assert.ok(!UT.tracePipe({ Ro, T, x0: 0, dir: 1, angle: aMax + 2, spMax: 300 }).hitsID);
+  const q = UT.seamToUV(Ro, -25, 7), f = UT.seamFromUV(Ro, q.u, q.v);
+  near(f.x, -25, 1e-9); near(f.z, 7, 1e-9);
+  const p = UT.tracePipe({ Ro, T, x0: -40, dir: 1, angle: 45, spMax: 200 });
+  const s1 = p.pts[1].s;
+  const L = UT.locatePipe(s1, 45, Ro, T, -40, 1);
+  near(L.depth, T, 1e-6, 'titik pantul pertama di dinding dalam');
+  assert.ok(s1 > T / Math.cos(Math.PI / 4), 'SP ke dinding dalam lebih panjang dari pelat datar');
+});
+test('bahasa Inggris: setiap pelajaran punya terjemahan dengan jumlah langkah yang sama', () => {
+  UT.LESSONS.forEach((l) => {
+    const e = UT.LESSONS_EN[l.id];
+    assert.ok(e, `terjemahan ${l.id}`);
+    assert.strictEqual(e[2].length, l.steps.length, `jumlah langkah ${l.id}`);
+    l.steps.forEach((s, i) => {
+      if (s.hint) assert.ok(e[2][i][2], `petunjuk ${l.id}#${i}`);
+      if (s.quiz) assert.ok(e[2][i][3], `kuis ${l.id}#${i}`);
+    });
+  });
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);
