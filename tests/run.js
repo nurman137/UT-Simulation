@@ -4,7 +4,7 @@
 'use strict';
 const assert = require('assert');
 const path = require('path');
-['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap', 'scanplan', 'corrosion', 'raypath', 'tutorial', 'i18n-lessons-en'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
+['config', 'geometry', 'defects', 'physics', 'specimens', 'calibration', 'dac', 'exam', 'report', 'imaging', 'rekap', 'scanplan', 'corrosion', 'raypath', 'tubular', 'tutorial', 'i18n-lessons-en'].forEach((f) => require(path.join(__dirname, '..', 'src', f + '.js')));
 const UT = globalThis.UT;
 const C = UT.CONFIG;
 
@@ -752,6 +752,64 @@ test('bahasa Inggris: setiap pelajaran punya terjemahan dengan jumlah langkah ya
       if (s.quiz) assert.ok(e[2][i][3], `kuis ${l.id}#${i}`);
     });
   });
+});
+
+// ---- v0.9: sambungan tubular
+test('tubular: sudut dihedral lokal Ψ (T: crown 90°, saddle 180° − acos β; Y: heel 180° − θ, toe θ)', () => {
+  const T = UT.tubJoint({ tubType: 'T' });
+  near(UT.tubDihedral(T, 0), 90, 1e-6);
+  near(UT.tubDihedral(T, 90), 180 - Math.acos(T.beta) * 180 / Math.PI, 1e-6);
+  const Y = UT.tubJoint({ tubType: 'Y', tubTheta: 45 });
+  near(UT.tubDihedral(Y, 0), 135, 1e-6);
+  near(UT.tubDihedral(Y, 180), 45, 1e-6);
+  assert.strictEqual(UT.tubZone(Y, 175), 'toe');
+  assert.strictEqual(UT.tubZone(Y, 5), 'heel');
+  assert.strictEqual(UT.tubZone(Y, 95), 'sisi');
+});
+test('tubular: titik perpotongan berada di permukaan chord; K punya gap yang diminta', () => {
+  const J = UT.tubJoint({ tubType: 'K', tubTheta: 45, tubGap: 30 });
+  for (let p = 0; p < 360; p += 30) {
+    const q = UT.tubIntersect(J, p).p;
+    near(Math.hypot(q[1], q[2]), J.R, 1e-6);
+  }
+  const h1 = UT.tubIntersect(J, 0).p[0];
+  const h2 = UT.tubIntersect(J, 0, UT.tubBrace(J, 2)).p[0];
+  near(h2 - h1, 30 + 2 * UT.tubWeldWidth(J, 180 - J.theta), 1e-6);
+});
+test('tubular: sinar tetap di dalam baja, LOF heel paling kuat pada sudut ideal muka bevel', () => {
+  const spec = UT.buildTubularSpec({ tubType: 'Y', tubTheta: 45, tubScenario: 'lof-brace' });
+  const L = UT.tubLocal(spec, 0);
+  const p = UT.traceTubular(L.sec, { x0: -40, angle: 45, spMax: 120 });
+  // titik tengah setiap segmen lintasan berada di dalam baja
+  for (let i = 1; i < p.pts.length; i++) {
+    const a = p.pts[i - 1], c = p.pts[i];
+    if (c.s - a.s > 0.5) assert.ok(UT.tubInside(L.sec, (a.x + c.x) / 2, (a.z + c.z) / 2), `segmen ${i}`);
+  }
+  near(UT.tubIdealAngles(L.sec).brace, 45, 0.5);
+  const best = (ang) => {
+    let m = 0;
+    for (let x = -120; x <= L.sec.Be[0] - 11; x += 1) {
+      const s = UT.simulatePath({ probe: { freq: 4, crystal: 10, y: 0 }, mat: C.material, path: UT.traceTubular(L.sec, { x0: x, angle: ang, spMax: 130 }), scene: { points: L.scene.points, corners: [] }, grain: null, spStart: 5, spEnd: 125, n: 2000 });
+      m = Math.max(m, peakOf(s).amp);
+    }
+    return m;
+  };
+  const a45 = best(45), a70 = best(70);
+  assert.ok(20 * Math.log10(a45 / a70) > 10, `45° vs 70°: ${(20 * Math.log10(a45 / a70)).toFixed(1)} dB`);
+});
+test('tubular: cacat hanya memberi echo di rentang φ-nya', () => {
+  const spec = UT.buildTubularSpec({ tubType: 'Y', tubTheta: 45, tubScenario: 'lof-brace' });
+  const r = spec.J.r;
+  const amp = (phi) => {
+    const L = UT.tubLocal(spec, phi * Math.PI / 180 * r);
+    let m = 0;
+    for (let x = -60; x <= -25; x += 1) {
+      const s = UT.simulatePath({ probe: { freq: 4, crystal: 10, y: phi * Math.PI / 180 * r }, mat: C.material, path: UT.traceTubular(L.sec, { x0: x, angle: 45, spMax: 80 }), scene: { points: L.scene.points, corners: [] }, grain: null, spStart: 5, spEnd: 70, n: 1500 });
+      m = Math.max(m, peakOf(s).amp);
+    }
+    return m;
+  };
+  assert.ok(amp(0) > 20 * amp(90), 'di heel ada, di sisi tidak');
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

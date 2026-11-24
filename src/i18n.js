@@ -435,10 +435,11 @@
     'Berkas tidak mengenai dinding dalam pipa (sudut terlalu besar untuk t/D ini)': 'The beam does not reach the inner pipe wall (angle too large for this t/D)',
     // panel Tentang (cakupan & model)
     'UT konvensional probe sudut, probe lurus 0° tunggal & dual (A-scan, B-scan, C-scan peta tebal), Phased Array S-scan & E-scan dengan fokus, TOFD.': 'Conventional UT with angle probes, single & dual 0° straight-beam probes (A-scan, B-scan, C-scan thickness map), Phased Array S-scan & E-scan with focusing, TOFD.',
-    'Las pelat (bevel V, X, U), pipa (las girth & memanjang), pelat korosi; baja karbon dan austenitik (dengan pembelokan berkas); gelombang geser & longitudinal.': 'Plate welds (V, X, U bevels), pipes (girth & longitudinal welds), corroded plate; carbon and austenitic steel (with beam skewing); shear & longitudinal waves.',
+    'Las pelat (bevel V, X, U), pipa (las girth & memanjang), sambungan tubular T/Y/K/X, pelat korosi; baja karbon dan austenitik (dengan pembelokan berkas); gelombang geser & longitudinal.': 'Plate welds (V, X, U bevels), pipes (girth & longitudinal welds), T/Y/K/X tubular joints, corroded plate; carbon and austenitic steel (with beam skewing); shear & longitudinal waves.',
+    'Sambungan tubular: geometri 3D dan sudut dihedral lokal Ψ dihitung tepat, tetapi simulasi UT memakai penampang lokal 2D (chord dianggap lurus secara lokal, tanpa skew berkas 3D). Evaluasi memakai %DAC (ASME) atau rating AWS; kriteria tubular Class R/X belum dimasukkan.': 'Tubular joints: the 3D geometry and local dihedral angle Ψ are computed exactly, but the UT simulation uses a 2D local section (chord treated as locally straight, no 3D beam skew). Evaluation uses %DAC (ASME) or the AWS rating; the tubular Class R/X criteria are not included.',
     'Kalibrasi dengan blok IIW V1 (dua sisi), V2 (sisi atas & miring), dan blok kalibrasi dasar ASME (DAC/TCG).': 'Calibration with the IIW V1 block (two faces), V2 (top & slanted faces) and the ASME basic calibration block (DAC/TCG).',
     'Scan tegak lurus dan sejajar las; 14 jenis skenario cacat (termasuk laminasi logam induk) + cacat acak; rencana scan & peta cakupan.': 'Scanning perpendicular and parallel to the weld; 14 flaw scenarios (including base-metal lamination) + random flaws; scan plan & coverage map.',
-    'Evaluasi menurut ASME Sec. VIII Div. 1 App. 12 atau AWS D1.1, tutorial 15 pelajaran, ujian (termasuk ujian praktik lengkap) & rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s). Tampilan bahasa Indonesia atau Inggris.': 'Evaluation to ASME Sec. VIII Div. 1 App. 12 or AWS D1.1, 15 tutorial lessons, exams (including a full practical exam) & class summary. Works offline after being opened once over http(s). Indonesian or English interface.',
+    'Evaluasi menurut ASME Sec. VIII Div. 1 App. 12 atau AWS D1.1, tutorial 17 pelajaran, ujian (termasuk ujian praktik lengkap) & rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s). Tampilan bahasa Indonesia atau Inggris.': 'Evaluation to ASME Sec. VIII Div. 1 App. 12 or AWS D1.1, 17 tutorial lessons, exams (including a full practical exam) & class summary. Works offline after being opened once over http(s). Indonesian or English interface.',
     'Penampang 2D: lintasan sinar dengan pantulan di permukaan datar atau lengkung; amplitudo dari penjumlahan koheren titik-titik permukaan cacat (Huygens/Kirchhoff), profil berkas Gaussian, atenuasi, dan penyebaran berkas.': '2D cross-section: ray paths with reflections at flat or curved surfaces; amplitude from the coherent sum of flaw surface points (Huygens/Kirchhoff), Gaussian beam profile, attenuation and beam spreading.',
     'Dimensi blok V1/V2 diturunkan dari skala sudut pada blok fisik; blok kalibrasi ASME disederhanakan (tebal blok = tebal las).': 'V1/V2 block dimensions are derived from the angle scales on the physical blocks; the ASME calibration block is simplified (block thickness = weld thickness).',
     // bantuan blok & info
@@ -503,6 +504,41 @@
     'Keputusan /15': 'Decision /15',
     'Nilai:': 'Score:',
     'Tanpa cacat (hanya geometri las)': 'No flaw (weld geometry only)',
+    // sambungan tubular
+    'Sambungan tubular': 'Tubular joint',
+    'Jenis sambungan': 'Joint type',
+    'Chord OD (mm)': 'Chord OD (mm)',
+    'Tebal chord (mm)': 'Chord wall (mm)',
+    'Brace OD (mm)': 'Brace OD (mm)',
+    'Tebal brace (mm)': 'Brace wall (mm)',
+    'Sudut brace θ (°)': 'Brace angle θ (°)',
+    'Gap K (mm)': 'K gap (mm)',
+    'Posisi keliling φ:': 'Circumferential position φ:',
+    'Brace dan chord berporos saling memotong; φ = 0° di heel (sisi tumpul), 180° di toe (sisi lancip). Simulasi memakai penampang lokal di posisi φ dengan chord dianggap lurus secara lokal; pembelokan berkas keluar bidang (3D) tidak dimodelkan. Pada K, brace kedua hanya muncul di penampang dekat heel (daerah gap); pada X, brace di sisi bawah chord diperiksa terpisah dengan cara yang sama.': 'Brace and chord axes intersect; φ = 0° at the heel (obtuse side), 180° at the toe (acute side). The simulation uses the local section at position φ with the chord treated as locally straight; out-of-plane (3D) beam skew is not modelled. For K joints the second brace only appears in sections near the heel (gap region); for X joints the brace on the underside of the chord is examined separately in the same way.',
+    'T (brace tegak lurus)': 'T (perpendicular brace)',
+    'Y (brace miring)': 'Y (inclined brace)',
+    'K (dua brace, ada gap)': 'K (two braces with a gap)',
+    'X (brace di kedua sisi chord)': 'X (braces on both sides of the chord)',
+    'Tanpa cacat (hanya geometri)': 'No flaw (geometry only)',
+    'Las tubular sehat. Echo yang muncul berasal dari akar las, kaki las, dan bagian chord.': 'Sound tubular weld. The echoes come from the weld root, weld toe and the chord.',
+    'LOF sisi brace (daerah heel)': 'LOF on brace side (heel zone)',
+    'Tidak menyatu pada muka bevel brace di daerah heel. Paling jelas bila berkas tegak lurus muka bevel (lihat sudut yang disarankan).': 'Lack of fusion on the brace bevel face in the heel zone. Clearest when the beam is perpendicular to the bevel face (see the suggested angle).',
+    'LOF sisi chord (daerah sisi)': 'LOF on chord side (side zone)',
+    'Tidak menyatu pada permukaan chord di daerah sisi/saddle. Bidangnya mengikuti permukaan chord sehingga orientasinya berubah menurut Ψ.': 'Lack of fusion on the chord surface in the side/saddle zone. Its plane follows the chord surface, so its orientation changes with Ψ.',
+    'Akar tidak tertembus (daerah toe)': 'Incomplete root penetration (toe zone)',
+    'Akar las tidak tertembus di daerah toe yang sempit (Ψ lancip): daerah tersulit untuk dilas dan diperiksa.': 'Incomplete root penetration in the narrow toe zone (acute Ψ): the hardest area to weld and to examine.',
+    'Retak kaki las sisi brace (hot spot)': 'Brace-side weld toe crack (hot spot)',
+    'Retak lelah yang berawal di kaki las pada permukaan brace dan menjalar ke dinding brace; bersama permukaan luar brace membentuk corner trap (terlihat lewat leg 2). Retak di kaki las sisi chord sulit dijangkau berkas dari brace dan biasanya diperiksa dengan MT.': 'A fatigue crack starting at the weld toe on the brace surface and growing into the brace wall; with the outer brace surface it forms a corner trap (seen via leg 2). Chord-side toe cracks are hard to reach with a beam from the brace and are usually examined with MT.',
+    'Porositas di logam las': 'Porosity in the weld metal',
+    'Kumpulan pori di logam las; echo lemah dan berpuncak banyak.': 'A cluster of pores in the weld metal; weak echoes with many peaks.',
+    'Campuran (LOF brace + retak kaki + porositas)': 'Mixed (brace LOF + toe crack + porosity)',
+    'Beberapa cacat di posisi keliling yang berbeda. Scan seluruh keliling brace dan catat posisi φ setiap indikasi.': 'Several flaws at different circumferential positions. Scan the whole brace circumference and record the φ position of each indication.',
+    'Tampilan scanning (penampang lokal sambungan tubular)': 'Scanning view (local section of tubular joint)',
+    'Tampilan 3D sambungan': '3D view of the joint',
+    '– klik atau seret di garis las untuk memilih posisi keliling φ': '– click or drag on the weld line to choose the circumferential position φ',
+    'Rekam keliling brace (φ)': 'Record around the brace (φ)',
+    'brace': 'brace',
+    'chord': 'chord',
   };
   const matEN = (s) => s.replace('Baja karbon', 'Carbon steel').replace('Baja tahan karat austenitik', 'Austenitic stainless steel');
 
@@ -583,7 +619,16 @@
     [/^Tampilan scanning \(penampang keliling pipa OD (\S+), las memanjang\)$/, (m, a) => `Scanning view (circumferential section of pipe OD ${a}, longitudinal weld)`],
     [/^Tampilan scanning \(penampang aksial dinding pipa OD (\S+)\)$/, (m, a) => `Scanning view (axial section of pipe wall OD ${a})`],
     [/^(\d+) titik · reference level$/, (m, n) => `${n} points · reference level`],
+    [/^Penampang lokal di φ = (\S+)° · zona (\S+) · sudut dihedral Ψ = (\S+)°$/, (m, a, z, p) => `Local section at φ = ${a}° · ${zoneEN(z)} zone · dihedral angle Ψ = ${p}°`],
+    [/^Ψ = (\S+)° \((\S+)\) · sudut ideal: muka bevel brace ≈ (\S+)° \(leg 2\), muka chord ≈ (\S+)° \(leg 1\)$/, (m, p, z, a, b) => `Ψ = ${p}° (${zoneEN(z)}) · ideal angles: brace bevel face ≈ ${a}° (leg 2), chord face ≈ ${b}° (leg 1)`],
+    [/^φ (\S+)° · (\S+) · Ψ (\S+)°$/, (m, a, z, p) => `φ ${a}° · ${zoneEN(z)} · Ψ ${p}°`],
+    [/^(\S+)° \((\S+), Ψ = (\S+)°\)$/, (m, a, z, p) => `${a}° (${zoneEN(z)}, Ψ = ${p}°)`],
+    [/^(heel|toe|sisi|crown|saddle) (\d+)°$/, (m, z, a) => `${zoneEN(z)} ${a}°`],
+    [/^Sambungan (T|Y|K|X) · (.+)$/, (m, t, r) => `${t} joint · ${r}`],
+    [/^Sambungan tubular (T|Y|K|X)$/, (m, t) => `Tubular joint ${t}`],
+    [/^(.+)\. Tebal pelat T = tebal brace \(untuk blok DAC\)\. Keliling brace (\S+) mm \(φ = 0° di heel\)\.$/, (m, mat, c) => `${matEN(mat)}. Plate thickness T = brace wall (for the DAC block). Brace circumference ${c} mm (φ = 0° at the heel).`],
   ];
+  const zoneEN = (z) => ({ sisi: 'side' }[z] || z);
 
   // ------------------------------------------------------------------ frasa (cadangan teks dinamis)
   const PH = [
@@ -648,6 +693,7 @@
     ['1 cacat', '1 flaw'], ['jumlah cacat dirahasiakan', 'number of flaws hidden'],
     ['tidak ada echo di gate', 'no echo in the gate'], ['file diimpor', 'file(s) imported'], ['duplikat dilewati', 'duplicates skipped'],
     ['dikurangi', 'minus'], ['untuk', 'for'], ['kode soal', 'task code'], ['siswa', 'student'],
+    ['ukuran sambungan berubah', 'joint size changed'],
     ['menit', 'min'], ['dari', 'of'],
   ];
 

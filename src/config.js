@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '0.8.0',
+    version: '0.9.0',
 
     // Material aktif (objek ini diperbarui oleh UT.setMaterial; referensinya tetap sama)
     material: {},
@@ -56,6 +56,7 @@
     defaults: {
       specimen: 'las',
       dual: false,
+      tubType: 'Y', tubD: 323.9, tubTc: 16, tubd: 168.3, tubTb: 10, tubTheta: 45, tubGap: 25, tubScenario: 'lof-brace',
       seam: false,
       aniso: true,
       korosiSeed: 2468,

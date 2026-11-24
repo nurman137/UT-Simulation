@@ -135,5 +135,22 @@
       ['Rating', 'Read the rating d in the “AWS rating (d)” readout.', null, 'Rating d'],
       ['Done', 'Class A is rejected; classes B and C are rejected when their length exceeds the limit; class D is accepted. The table in the simulator is for education – always use the table from the applicable edition of AWS D1.1.', null, null],
     ]],
+    tubular: ['16. Tubular joints: dihedral angle & zones', 'The local dihedral angle Ψ varying around the brace, heel/side/toe zones, and choosing the probe angle.', [
+      ['Y joint', 'A Ø168 × 10 brace is welded to a Ø324 × 16 chord at θ = 45°. Below the cross-section: the 3D view; the red dot = the circumferential position φ being examined. The cross-section above is the local section at that φ: the probe on the brace surface, the beam heading for the weld and chord.', null, null],
+      ['To the toe', 'Move the circumferential position to the toe (φ = 180°) with the 180° button, the φ slider, or by clicking the weld line in the 3D view. Note how the weld and chord shapes change.', null, null],
+      ['Dihedral angle at the toe', 'The local dihedral angle Ψ is the angle between the outer surfaces of the brace and the chord. At the toe it is acute, so the groove is narrow and hard to examine. What is Ψ at this position?', null, 'Ψ'],
+      ['To the heel', 'Go back to the heel (φ = 0°). Here Ψ is obtuse (180° − θ). See the info line above the cross-section: the ideal angles for the brace bevel face and the chord face.', null, null],
+      ['Choose the probe angle', 'The brace bevel face at the heel is best examined with a beam perpendicular to it. Change the probe angle to 45° (the ideal angle for the bevel face via leg 2).', null, null],
+      ['Find the LOF', 'Choose the flaw scenario “LOF on brace side (heel zone)” on the Tubular joint card, then move the probe (← →) until the LOF echo is ≥ 60% FSH.', 'The beam must reflect once at the inner brace surface (leg 2) before hitting the bevel face. Adjust the gain if needed.', null],
+      ['Done', 'In tubular joints Ψ changes continuously around the brace, so the groove shape, the best probe angle and the probe distance change too. Tubular UT procedures divide the circumference into zones (heel, side, toe) and use different probe angles for each zone.', null, null],
+    ]],
+    tubk: ['17. K & X joints: scanning around the brace', 'A circumferential B-scan of the brace to locate indications, the gap region of K joints, and X joints.', [
+      ['K joint', 'Two braces meet on the chord with a gap between them (see the 3D view). The weld contains several flaws at different circumferential positions. In the section near the heel (φ ≈ 0°) the second brace appears across the gap.', null, null],
+      ['Circumferential B-scan', 'Press “Record around the brace (φ)” above the A-scan. The probe stays at the same distance from the weld while the circumferential position is swept 0–360°. Wait until it is complete.', null, null],
+      ['Toe crack', 'Move to the side zone (around φ = 90°) and find the brace-side weld toe crack echo ≥ 40% FSH (adjust the probe distance and gain).', 'The crack starts at the weld toe on the brace surface; with that surface it forms a corner trap seen via leg 2 (strongest with a 45° probe).', null],
+      ['Circumferential position', 'Record the circumferential position of the indication: in tubular reports the location is given as φ (or a clock position) around the brace.', null, 'φ'],
+      ['X joint', 'Change the joint type to X. The second brace is now on the underside of the chord and is examined separately in the same way; the local section of the upper brace does not change.', null, null],
+      ['Done', 'On tubular joints the scan covers the whole circumference of every brace with probe angles suited to each zone. Indication locations are recorded as circumferential position φ, distance from the weld toe, and depth.', null, null],
+    ]],
   };
 })(typeof window !== 'undefined' ? window : globalThis);

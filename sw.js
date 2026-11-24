@@ -2,7 +2,7 @@
  * Service worker: simpan semua berkas aplikasi agar simulator bisa dipakai tanpa internet.
  * Ganti CACHE setiap rilis supaya versi lama dibersihkan.
  */
-const CACHE = 'ut-sim-v0.8.0';
+const CACHE = 'ut-sim-v0.9.0';
 const FILES = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ const FILES = [
   "./src/physics.js",
   "./src/raypath.js",
   "./src/rekap.js",
+  "./src/render-tubular.js",
   "./src/render-ascan.js",
   "./src/render-images.js",
   "./src/render-section.js",
@@ -32,6 +33,7 @@ const FILES = [
   "./src/report.js",
   "./src/scanplan.js",
   "./src/specimens.js",
+  "./src/tubular.js",
   "./src/tutorial.js",
 ];
 
