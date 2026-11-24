@@ -56,6 +56,7 @@
     defaults: {
       specimen: 'las',
       iiwFace: 'A',
+      v2Face: 'A',
       material: 'cs',
       wave: 'T',
       geom: 'pelat',

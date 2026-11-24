@@ -85,7 +85,10 @@
       if (spec.face === 'B') return dir() > 0 ? 60 : sc.hx + sc.hz * tn + 12;
       return dir() > 0 ? UT.IIW.r100.cx - 25 : sc.hx + sc.hz * tn + 18;
     }
-    if (spec.type === 'v2') return dir() > 0 ? -6 : 6;
+    if (spec.type === 'v2') {
+      if (spec.face === 'B') return dir() > 0 ? Math.max(spec.xMin + 2, -(spec.marks.scale.hz * tn + 4)) : 5;
+      return dir() > 0 ? -6 : 6;
+    }
     if (spec.type === 'asme') {
       const xs = UT.ASME_BLOCK.holesX;
       return dir() > 0 ? xs[0] - spec.T * 0.25 * tn - 10 : xs[2] + spec.T * 0.75 * tn + 10;
@@ -254,7 +257,16 @@
     };
 
     sel('inT', 'T', parseFloat, () => { clearDac('tebal benda uji berubah'); resetSizing(); rebuild(); });
-    sel('inFace', 'iiwFace', null, () => { S.probeX = null; rebuild(); });
+    $('inFace').addEventListener('change', (e) => {
+      if (S.specimen === 'v2') {
+        S.v2Face = e.target.value;
+        if (S.v2Face === 'B') Object.assign(S, { side: 'kiri', gateStart: 8, gateWidth: 30, range: 100 });
+        else Object.assign(S, { side: 'kiri', gateStart: 35, gateWidth: 30, range: 225 });
+      } else S.iiwFace = e.target.value;
+      S.probeX = null;
+      rebuild();
+      syncControls();
+    });
     fillSelect($('inMaterial'), Object.values(C.materials), (m) => m.name, (m) => m.id);
     fillSelect($('inOD'), C.options.ods, (v) => `${v} mm`);
     $('inMaterial').addEventListener('change', (e) => setMaterial(e.target.value));
@@ -374,7 +386,11 @@
     S.specimen = id;
     if (id === 'las') Object.assign(S, { range: 125, delay: 0, gateStart: 40, gateWidth: 50 });
     if (id === 'iiw') Object.assign(S, { side: 'kiri', range: 250, delay: 0, gateStart: 80, gateWidth: 40 });
-    if (id === 'v2') Object.assign(S, { side: 'kiri', range: 225, delay: 0, gateStart: 35, gateWidth: 30 });
+    if (id === 'v2') {
+      Object.assign(S, S.v2Face === 'B'
+        ? { side: 'kiri', range: 100, delay: 0, gateStart: 8, gateWidth: 30 }
+        : { side: 'kiri', range: 225, delay: 0, gateStart: 35, gateWidth: 30 });
+    }
     if (id === 'asme') {
       const r = Math.ceil((S.T * 2.6) / Math.cos(S.angle * DEG) / 25) * 25;
       Object.assign(S, { side: 'kiri', range: Math.max(75, r), delay: 0, gateStart: 5, gateWidth: Math.max(40, r - 10) });
@@ -452,8 +468,16 @@
     $('topWrap').hidden = !weld;
     $('sizingCard').hidden = !weld;
     $('inT').disabled = S.specimen === 'iiw' || S.specimen === 'v2' || locks.scenario;
-    $('lblFace').hidden = S.specimen !== 'iiw';
-    $('inFace').value = S.iiwFace;
+    $('lblFace').hidden = S.specimen !== 'iiw' && S.specimen !== 'v2';
+    const faceOpts = S.specimen === 'v2'
+      ? [['A', 'Sisi atas – R25/R50, Ø5 skala 35°–65°'], ['B', 'Sisi miring – Ø5 skala 65°–75°']]
+      : [['A', 'Sisi A – R100, Ø50, skala 35°–76°'], ['B', 'Sisi B – Ø1,5, skala 70°–80°']];
+    const fsel = $('inFace');
+    if (fsel.dataset.kind !== S.specimen) {
+      fsel.innerHTML = faceOpts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+      fsel.dataset.kind = S.specimen;
+    }
+    fsel.value = S.specimen === 'v2' ? S.v2Face : S.iiwFace;
     $('inScenario').disabled = !weld || locks.scenario;
     $('randRow').hidden = !weld || S.scenario !== 'acak' || locks.scenario;
     $('inSeed').value = S.randSeed;
@@ -582,7 +606,7 @@
     if (!spec) return;
     const hs = spec.T * Math.tan(userAngle() * DEG);
     $('skipInfo').textContent = spec.type === 'iiw' ? `Blok V1 sisi ${spec.face} · 300 × 100 mm`
-      : spec.type === 'v2' ? 'Blok V2 · R25 & R50 sepusat, lubang Ø5'
+      : spec.type === 'v2' ? `Blok V2 ${spec.face === 'B' ? 'sisi miring' : 'sisi atas'} · R25 & R50 sepusat, lubang Ø5`
       : isTech('tofd') && isWeld() ? `TOFD · PCS = ${(2 * tofdS()).toFixed(1)} mm · ${UT.TOFD.freq} MHz L-wave ${UT.TOFD.angle}°`
         : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${userAngle()}°)`;
     const d = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: S.angle, wave: S.wave }, C.material);
@@ -594,7 +618,7 @@
     $('specInfo').textContent = spec.type === 'iiw'
       ? `Blok IIW V1 (ISO 2400): 300 × 100 mm, R100, Ø50 (pusat 35 mm dari ujung, 27 mm dari sisi A), Ø1,5 (15 mm dari sisi B). Dimensi lubang diturunkan dari skala sudut pada blok. ${mat}.`
       : spec.type === 'v2'
-        ? `Blok V2 (ISO 7963): R25 dan R50 sepusat di permukaan pindai, panjang 75 mm, lubang Ø5 sedalam 20 mm di bawah titik pusat. ${mat}.`
+        ? `Blok V2 (ISO 7963): R25 dan R50 sepusat di sisi atas, panjang 75 mm, lubang Ø5 sedalam 20 mm di bawah titik pusat, sisi miring ${UT.V2.slantDeg}° menyinggung R25 (lubang ${UT.v2Geometry().d.toFixed(1)} mm dari sisi miring). ${mat}.`
       : spec.type === 'asme'
         ? `Tebal blok = T = ${spec.T} mm. SDH Ø${spec.sdhDiameter} mm pada kedalaman ${(spec.T / 4).toFixed(1)}, ${(spec.T / 2).toFixed(1)}, ${(spec.T * 0.75).toFixed(1)} mm.${spec.R ? ` Blok lengkung D = ${spec.OD} mm.` : ''} ${mat}.`
         : spec.isPipe
@@ -608,19 +632,22 @@
     const m = spec.marks || {};
     if (spec.type === 'iiw' || spec.type === 'v2') {
       const lines = ['<b>Pembacaan pada blok</b>'];
-      if (m.centerX != null) {
+      if (m.centerX != null && m.indexRef !== false) {
         const { xf } = UT.probeExtent(S.probeX, dir(), H);
         lines.push(`Muka depan probe → tanda ${spec.type === 'v2' ? 'pusat (0)' : 'pusat R100'}: <b>${(dir() * (xf - m.centerX)).toFixed(1)} mm</b>`);
       }
       if (m.scale) {
         const idx = userIndexX(), sc = m.scale;
+        const sg = sc.sign || 1; // +1: skala di kanan lubang (berkas ←), −1: skala di kiri lubang (berkas →)
         let ang = '–';
-        if (dir() < 0 && idx > sc.hx) ang = `${(Math.atan((idx - sc.hx) / sc.hz) / DEG).toFixed(1)}°`;
+        if (dir() === -sg && sg * (idx - sc.hx) > 0) ang = `${(Math.atan(Math.abs(idx - sc.hx) / sc.hz) / DEG).toFixed(1)}°`;
         const hole = spec.type === 'v2' ? 'Ø5' : spec.face === 'B' ? 'Ø1,5' : 'Ø50';
-        lines.push(`Skala sudut pada tanda index: <b>${ang}</b>${dir() > 0 ? ` <span class="muted">(arahkan berkas ← ke ${hole})</span>` : ''}`);
+        lines.push(`Skala sudut pada tanda index: <b>${ang}</b>${dir() !== -sg ? ` <span class="muted">(arahkan berkas ${sg > 0 ? '←' : '→'} ke ${hole})</span>` : ''}`);
       }
-      if (spec.type === 'v2') {
-        lines.push('<span class="muted">Menghadap R25 (berkas ←): echo 25, 100, 175 mm. Menghadap R50 (berkas →): echo 50, 125, 200 mm. Probe miniatur: wedge boleh menggantung di tepi blok.</span>');
+      if (spec.type === 'v2' && spec.face === 'B') {
+        lines.push(`<span class="muted">Sisi miring: cek sudut 65°–75° dengan lubang Ø5 (jarak ≈ ${m.scale.hz.toFixed(1)} mm dari permukaan). Tanda 0 tepat di atas lubang.</span>`);
+      } else if (spec.type === 'v2') {
+        lines.push('<span class="muted">Menghadap R25 (berkas ←): echo 25, 100, 175 mm. Menghadap R50 (berkas →): echo 50, 125, 200 mm. Sudut > 65° dicek dari sisi miring. Probe miniatur: wedge boleh menggantung di tepi blok.</span>');
       } else if (spec.face === 'B') {
         lines.push('<span class="muted">Sisi B: cek sudut 70°–80° dengan lubang Ø1,5 (15 mm dari permukaan). Untuk R100 dan Ø50 pakai sisi A.</span>');
       } else {

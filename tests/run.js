@@ -503,5 +503,23 @@ test('V1 sisi A: skala sudut terukir sesuai posisi Ø50 (60° ≈ 82 mm, 70° �
   assert.strictEqual(a.marks.centerX, 200);
 });
 
+test('V2 sisi miring: sisi miring menyinggung R25, cek sudut 65°–75° dengan lubang Ø5', () => {
+  const G = UT.v2Geometry();
+  near(Math.hypot(G.Tp[0], G.Tp[1]), 25, 1e-9, 'titik singgung R25');
+  near(Math.hypot(G.E[0], G.E[1]), 50, 1e-9, 'ujung di R50');
+  const b = UT.buildSpecimen({ specimen: 'v2', v2Face: 'B' });
+  [65, 70, 75].forEach((ang) => {
+    const r = (ang * Math.PI) / 180, xe = -G.d * Math.tan(r), sp = G.d / Math.cos(r) - UT.V2.hole.r;
+    assert.ok(xe > b.xMin, `tanda ${ang}° di dalam sisi miring`);
+    // blok diputar: skala di kiri tanda 0, probe menghadap kanan (→) ke lubang Ø5
+    const read = (Math.atan(-bestX(b, b.xMin + 1, -1, 1, ang, sp - 4, sp + 4) / G.d) * 180) / Math.PI;
+    near(read, ang, 2, `${ang}° terbaca`);
+  });
+  // sisi atas tetap memberi urutan echo R25/R50 yang benar
+  const a = UT.buildSpecimen({ specimen: 'v2', v2Face: 'A' });
+  assert.deepStrictEqual(blkPeaks(a, 0, -1, 45, 5, 230), [25, 100, 175]);
+  assert.deepStrictEqual(blkPeaks(a, 0, 1, 70, 5, 230), [50, 125, 200]);
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);

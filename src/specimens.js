@@ -35,11 +35,29 @@
   };
 
   // Blok V2 (ISO 7963): R25 dan R50 berpusat di satu titik pada permukaan pindai, lubang Ø5.
+  // Sisi miring (kiri bawah) menyinggung busur R25 dan berakhir di busur R50; kemiringan dari foto blok.
+  // Dari sisi miring, lubang Ø5 dipakai untuk cek sudut 65°–75°.
   UT.V2 = {
     R1: 25, R2: 50,
     hole: { x: 0, z: 20, r: 2.5 },
-    scale: { from: 35, to: 68, labels: [35, 40, 50, 60, 65] }, // terhadap Ø5
+    scale: { from: 35, to: 68, labels: [35, 40, 50, 60, 65] }, // terhadap Ø5, dari sisi atas
     arcTicks: { from: 40, to: 70, labels: [50, 60, 70] }, // tanda sudut pada busur R50
+    slantDeg: 31, // kemiringan sisi miring terhadap sisi atas
+    scaleB: { from: 60, to: 76, labels: [65, 70, 75] }, // terhadap Ø5, dari sisi miring
+  };
+
+  /** Geometri pokok blok V2 pada koordinat sisi atas (titik pusat di x = 0, z = 0). */
+  UT.v2Geometry = function () {
+    const B = UT.V2, f = (B.slantDeg * Math.PI) / 180;
+    const n = [-Math.sin(f), Math.cos(f)]; // normal sisi miring, mengarah ke luar blok
+    const u = [Math.cos(f), Math.sin(f)]; // arah sepanjang sisi miring (menuruni lereng)
+    const Tp = [B.R1 * n[0], B.R1 * n[1]]; // titik singgung dengan R25
+    const sEnd = Math.sqrt(B.R2 * B.R2 - B.R1 * B.R1);
+    const E = [Tp[0] + sEnd * u[0], Tp[1] + sEnd * u[1]]; // ujung sisi miring di busur R50
+    const h = B.hole;
+    const d = B.R1 - (h.x * n[0] + h.z * n[1]); // jarak lubang Ø5 ke sisi miring
+    const F = [h.x + d * n[0], h.z + d * n[1]]; // tanda "0" pada sisi miring
+    return { n, u, Tp, E, d, F, aT: Math.atan2(Tp[0], Tp[1]) * (180 / Math.PI), aE: Math.atan2(E[0], E[1]) * (180 / Math.PI) };
   };
 
   /** Diameter SDH blok kalibrasi dasar ASME berdasarkan tebal las (ASME Sec. V Art. 4, Fig. T-434.2.1). */
@@ -172,31 +190,58 @@
     return spec;
   }
 
-  function buildV2() {
-    const B = UT.V2;
+  function buildV2(face) {
+    const B = UT.V2, G = UT.v2Geometry();
+    const sideB = face === 'B';
     const points = [];
-    // Menghadap R25: 25, 100, 175 mm · menghadap R50: 50, 125, 200 mm (selisih 75 = 25 + 50)
-    const rep = { n: 2, step: B.R1 + B.R2, decay: 0.35 };
-    const a25 = arcPoints(points, 0, B.R1, 0, -90, rep);
-    const a50 = arcPoints(points, 0, B.R2, 0, 90, rep);
+    // Dari sisi atas: menghadap R25 → 25, 100, 175 mm; menghadap R50 → 50, 125, 200 mm (selisih 75 = 25 + 50).
+    // Echo berulang hanya terjadi bila probe berada di titik pusat (sisi atas).
+    const rep = sideB ? null : { n: 2, step: B.R1 + B.R2, decay: 0.35 };
+    const a25 = arcPoints(points, 0, B.R1, G.aT, -90, rep); // dari titik singgung ke (−25, 0)
+    const a50 = arcPoints(points, 0, B.R2, G.aE, 90, rep); // dari ujung sisi miring ke (50, 0)
     UT.sampleCircle(points, B.hole.x, B.hole.z, B.hole.r, { refl: 1 });
     const outline = [[-B.R1, 0], [B.R2, 0]];
-    a50.slice().reverse().forEach((p) => outline.push(p)); // (50,0) → (0,50)
-    outline.push([0, B.R1]);
-    a25.slice(1).reverse().forEach((p) => outline.push(p)); // (0,25) → (−25,0)
+    a50.slice().reverse().forEach((p) => outline.push(p)); // (50,0) → E
+    outline.push(G.Tp.slice()); // sisi miring E → titik singgung
+    a25.forEach((p) => outline.push(p)); // titik singgung → (−25, 0)
     const spec = {
-      type: 'v2', name: 'Blok V2 (ISO 7963)', T: B.R2, xMin: -B.R1, xMax: B.R2, yLen: null, overhang: true,
+      type: 'v2', face: sideB ? 'B' : 'A', name: `Blok V2 – ${sideB ? 'sisi miring' : 'sisi atas'}`,
+      T: B.R2, xMin: -B.R1, xMax: B.R2, yLen: null, overhang: true,
       scene: { points, corners: [], shapes: { polys: [], circles: [], gaps: [] }, ipRanges: [], truth: [], rootBead: false },
       outline,
       holes: [{ x: B.hole.x, z: B.hole.z, r: B.hole.r, label: 'Ø5' }],
       marks: {
-        centerX: 0, centerLabel: '0',
+        centerX: 0, centerLabel: '0', indexRef: true,
         scale: { hx: B.hole.x, hz: B.hole.z, from: B.scale.from, to: B.scale.to, labels: B.scale.labels, minorStep: 1 },
         arcTicks: { cx: 0, R: B.R2, from: B.arcTicks.from, to: B.arcTicks.to, labels: B.arcTicks.labels },
         arcLabel: { text: 'R50', x: 30, z: 33 },
-        arcLabel2: { text: 'R25', x: -17, z: 12 },
+        arcLabel2: { text: 'R25', x: -16, z: 9 },
       },
     };
+    if (sideB) {
+      // Putar blok (rotasi murni, bukan cermin) sehingga sisi miring menjadi permukaan atas:
+      // sumbu x' = −u (tanda 65°–75° berada di kiri tanda "0", seperti blok yang diputar), z' = kedalaman dari sisi miring
+      const { u, n, F } = G;
+      const tx = (x, z) => -((x - F[0]) * u[0] + (z - F[1]) * u[1]);
+      const tz = (x, z) => B.R1 - (x * n[0] + z * n[1]);
+      points.forEach((p) => {
+        const x = tx(p.x, p.z), z = tz(p.x, p.z);
+        const nx = -(p.nx * u[0] + p.nz * u[1]), nz = -(p.nx * n[0] + p.nz * n[1]);
+        p.x = x; p.z = z; p.nx = nx; p.nz = nz;
+      });
+      spec.outline = outline.map(([x, z]) => [tx(x, z), tz(x, z)]);
+      spec.holes = [{ x: 0, z: G.d, r: B.hole.r, label: 'Ø5' }];
+      spec.xMin = tx(G.E[0], G.E[1]);
+      spec.xMax = tx(G.Tp[0], G.Tp[1]);
+      spec.T = Math.max(...spec.outline.map((q) => q[1]));
+      const lab = (x, z) => ({ x: tx(x, z), z: tz(x, z) });
+      spec.marks = {
+        centerX: 0, centerLabel: '0', indexRef: false,
+        scale: { hx: 0, hz: G.d, from: B.scaleB.from, to: B.scaleB.to, labels: B.scaleB.labels, minorStep: 1, sign: -1 },
+        arcLabel: Object.assign({ text: 'R50' }, lab(30, 33)),
+        arcLabel2: Object.assign({ text: 'R25' }, lab(-16, 9)),
+      };
+    }
     spec.grain = UT.buildGrain(spec, 77);
     return spec;
   }
@@ -243,7 +288,7 @@
 
   UT.buildSpecimen = function (S) {
     if (S.specimen === 'iiw') return buildIIW(S.iiwFace);
-    if (S.specimen === 'v2') return buildV2();
+    if (S.specimen === 'v2') return buildV2(S.v2Face);
     if (S.specimen === 'asme') return buildASME(S.T, S.asmeCurved ? S.OD : null);
     return buildWeldSpecimen(S);
   };

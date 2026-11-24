@@ -231,7 +231,9 @@
       ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.fillStyle = COL.engrave;
-      const ly = h.r * v.s > 14 ? Z(h.z) + 4 : Z(h.z) - Math.max(2, h.r * v.s) - 5;
+      const pr = Math.max(2, h.r * v.s);
+      // lubang dekat permukaan: label di bawah lubang agar tidak bertumpuk dengan tanda di permukaan
+      const ly = h.r * v.s > 14 ? Z(h.z) + 4 : (Z(h.z) - pr - Z(0) < 28 ? Z(h.z) + pr + 12 : Z(h.z) - pr - 5);
       ctx.fillText(h.label, X(h.x), ly);
     });
 
@@ -263,7 +265,7 @@
       ctx.font = '10px system-ui, sans-serif';
       ctx.textAlign = 'center';
       for (let a = sc.from; a <= sc.to; a += sc.minorStep || 1) {
-        const x = sc.hx + sc.hz * Math.tan(a * DEG);
+        const x = sc.hx + (sc.sign || 1) * sc.hz * Math.tan(a * DEG);
         if (x < spec.xMin || x > spec.xMax) continue;
         const lab = sc.labels.includes(a);
         ctx.beginPath();

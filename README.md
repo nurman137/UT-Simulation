@@ -16,10 +16,11 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
   - **Sisi A**: R100 dengan tanda pusat (echo 100 dan 200 mm), lubang Ø50 dekat ujung blok, skala sudut 35°–76°.
   - **Sisi B**: lubang Ø1,5 berjarak 15 mm dari permukaan untuk cek sudut 70°–80°, dan penggaris 0–20 cm.
   - Posisi lubang diturunkan dari skala sudut yang terukir pada blok (tanda θ di x = x_lubang + d·tan θ).
-- **Blok V2 (ISO 7963)**:
-  - R25 dan R50 sepusat di permukaan pindai, panjang 75 mm, lubang Ø5 sedalam 20 mm di bawah titik pusat.
+- **Blok V2 (ISO 7963)** dengan dua permukaan pindai:
+  - **Sisi atas**: R25 dan R50 sepusat, panjang 75 mm, lubang Ø5 sedalam 20 mm di bawah titik pusat.
+  - **Sisi miring** (31°, menyinggung R25): lubang Ø5 berjarak ≈ 7,9 mm dari permukaan, skala 65°–75°. Tampilannya adalah blok yang diputar, sehingga skala berada di kiri tanda 0.
   - Menghadap R25 → echo 25, 100, 175 mm. Menghadap R50 → echo 50, 125, 200 mm.
-  - Skala sudut 35°–65° untuk lubang Ø5, dan tanda sudut pada busur R50.
+  - Skala sudut 35°–65° (sisi atas) untuk lubang Ø5, dan tanda sudut pada busur R50.
   - Blok kecil ini ditujukan untuk probe miniatur, jadi wedge boleh menggantung di tepi blok.
 
 ### v0.5 – Pipa, material austenitik & rekap kelas
