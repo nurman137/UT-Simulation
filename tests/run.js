@@ -154,7 +154,7 @@ test('IIW: cek sudut – echo Ø50 maksimum bila sumbu berkas melewati pusat lub
   const xExp = h.x + h.z * Math.tan(ang * Math.PI / 180);
   let best = { amp: 0 };
   for (let x = xExp - 15; x <= xExp + 15; x += 0.25) {
-    const s = UT.simulate({ probe: { x, dir: -1, angle: ang, freq: 4, crystal: 10 }, mat: C.material, T: 100, scene, grain: null, spStart: 60, spEnd: 200, n: 4000 });
+    const s = UT.simulate({ probe: { x, dir: -1, angle: ang, freq: 4, crystal: 10 }, mat: C.material, T: 100, scene, grain: null, spStart: 5, spEnd: 120, n: 4000 });
     const pk = peakOf(s);
     if (pk.amp > best.amp) best = Object.assign(pk, { x });
   }
@@ -447,6 +447,60 @@ test('rekap: statistik kelas dan CSV', () => {
   assert.ok(csv.startsWith('﻿Nama;Kode soal'));
   assert.ok(csv.includes('"A; ""x"""'), 'nama dengan ; dan " di-escape');
   assert.ok(csv.includes('1:30'));
+});
+
+console.log('Blok V1 (sisi A/B) & V2');
+const blkPeaks = (spec, x, dir, ang, s0, s1) => {
+  const s = UT.simulate({ probe: { x, dir, angle: ang, freq: 4, crystal: 10 }, mat: C.material, T: spec.T, scene: { points: spec.scene.points, corners: [] }, grain: null, spStart: s0, spEnd: s1, n: 6000 });
+  const out = [];
+  for (let i = 8; i < s.n - 8; i++) {
+    const v = Math.abs(s.re[i]);
+    let ok = v > 0.02;
+    for (let k = -8; k <= 8 && ok; k++) if (Math.abs(s.re[i + k]) > v) ok = false;
+    if (ok) out.push({ sp: s.spStart + (i * (s.spEnd - s.spStart)) / (s.n - 1), v });
+  }
+  const m = Math.max(...out.map((o) => o.v));
+  return out.filter((o) => o.v > 0.1 * m).map((o) => Math.round(o.sp));
+};
+const bestX = (spec, x0, x1, dir, ang, s0, s1) => {
+  let b = { a: 0 };
+  for (let x = x0; x <= x1; x += 0.25) {
+    const s = UT.simulate({ probe: { x, dir, angle: ang, freq: 4, crystal: 10 }, mat: C.material, T: spec.T, scene: { points: spec.scene.points, corners: [] }, grain: null, spStart: s0, spEnd: s1, n: 1500 });
+    let m = 0;
+    for (let i = 0; i < s.n; i++) m = Math.max(m, Math.abs(s.re[i]));
+    if (m > b.a) b = { a: m, x };
+  }
+  return b.x;
+};
+test('V2: menghadap R25 → 25/100/175 mm, menghadap R50 → 50/125/200 mm', () => {
+  const v2 = UT.buildSpecimen({ specimen: 'v2' });
+  [45, 60, 70].forEach((ang) => {
+    assert.deepStrictEqual(blkPeaks(v2, 0, -1, ang, 5, 230), [25, 100, 175], `R25 ${ang}°`);
+    assert.deepStrictEqual(blkPeaks(v2, 0, 1, ang, 5, 230), [50, 125, 200], `R50 ${ang}°`);
+  });
+});
+test('V2: cek sudut dengan lubang Ø5 sesuai skala (45°–65°)', () => {
+  const v2 = UT.buildSpecimen({ specimen: 'v2' });
+  const h = UT.V2.hole;
+  [45, 55, 65].forEach((ang) => {
+    const t = Math.tan((ang * Math.PI) / 180), sp = h.z / Math.cos((ang * Math.PI) / 180) - h.r;
+    near(bestX(v2, 2, 49, -1, ang, sp - 3, sp + 3), h.x + h.z * t, 1.5, `${ang}°`);
+  });
+});
+test('V1 sisi B: cek sudut 70° dengan lubang Ø1,5 (15 mm dari permukaan)', () => {
+  const b = UT.buildSpecimen({ specimen: 'iiw', iiwFace: 'B' });
+  const h = UT.IIW.hole15, ang = 70, t = Math.tan((ang * Math.PI) / 180);
+  const sp = h.zB / Math.cos((ang * Math.PI) / 180);
+  near(bestX(b, h.x + h.zB * t - 12, h.x + h.zB * t + 12, -1, ang, sp - 4, sp + 4), h.x + h.zB * t, 2.5);
+  // pada sisi B, lubang Ø1,5 berada 15 mm di bawah permukaan pindai
+  assert.ok(b.holes.some((hh) => hh.label === 'Ø1,5' && Math.abs(hh.z - 15) < 1e-9));
+});
+test('V1 sisi A: skala sudut terukir sesuai posisi Ø50 (60° ≈ 82 mm, 70° ≈ 109 mm dari ujung)', () => {
+  const a = UT.buildSpecimen({ specimen: 'iiw', iiwFace: 'A' });
+  const sc = a.marks.scale;
+  near(sc.hx + sc.hz * Math.tan(Math.PI / 3), 81.8, 0.5);
+  near(sc.hx + sc.hz * Math.tan((70 * Math.PI) / 180), 109.2, 0.5);
+  assert.strictEqual(a.marks.centerX, 200);
 });
 
 console.log(`\n${passed} lulus, ${failed} gagal`);

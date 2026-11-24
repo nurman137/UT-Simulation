@@ -30,9 +30,9 @@
       <div>
         <h3>Alur kalibrasi (tombol “Probe baru”)</h3>
         <ol>
-          <li><b>Blok IIW – probe index:</b> arahkan probe ke R100, cari echo maksimum, baca jarak depan probe ke pusat R100 → isi <b>X-value</b>.</li>
-          <li><b>Blok IIW – range/zero:</b> atur <b>zero</b> (dan velocity) sampai echo R100 tepat di 100 mm dan echo kedua di 200 mm.</li>
-          <li><b>Blok IIW – sudut:</b> balik probe ke arah lubang Ø50, cari echo maksimum, baca skala sudut pada tanda index → isi <b>sudut terukur</b>.</li>
+          <li><b>Blok IIW V1 (atau V2) – probe index:</b> arahkan probe ke R100 (V2: R25/R50), cari echo maksimum, baca jarak depan probe ke tanda pusat → isi <b>X-value</b>.</li>
+          <li><b>Range/zero:</b> atur <b>zero</b> (dan velocity) sampai echo R100 tepat di 100 mm dan 200 mm. Pada V2: menghadap R25 → 25, 100, 175 mm; menghadap R50 → 50, 125, 200 mm.</li>
+          <li><b>Sudut:</b> balik probe ke arah lubang Ø50 (V1 sisi A; 70°–80° pakai Ø1,5 di sisi B; V2 pakai Ø5), cari echo maksimum, baca skala sudut pada tanda index → isi <b>sudut terukur</b>.</li>
           <li><b>Blok ASME – DAC:</b> maksimalkan echo SDH ¼T, ½T, ¾T lalu lanjutkan lewat leg 2 (¾T → 5/4T, ½T → 6/4T, ¼T → 7/4T) agar DAC mencakup satu skip penuh. Rekam setiap titik tanpa mengubah gain. Lalu “Gain = reference” dan “Gain scanning +6 dB”.</li>
           <li><b>Las:</b> scan, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, lihat hasil evaluasi ASME.</li>
         </ol>
@@ -146,6 +146,12 @@
         <label class="check"><input id="inCap" type="checkbox"> Cap (reinforcement) ada</label>
         <label class="check"><input id="inRoot" type="checkbox"> Root bead (penetrasi) ada</label>
       </div>
+      <label id="lblFace">Sisi pemindaian blok V1
+        <select id="inFace">
+          <option value="A">Sisi A – R100, Ø50, skala 35°–76°</option>
+          <option value="B">Sisi B – Ø1,5, skala 70°–80°</option>
+        </select>
+      </label>
       <label class="check" id="lblAsmeCurved"><input id="inAsmeCurved" type="checkbox"> Blok lengkung (diameter = OD pipa)</label>
       <label id="lblOD">Diameter luar pipa OD
         <select id="inOD"></select>

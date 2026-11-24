@@ -236,34 +236,66 @@
     });
 
     const m = spec.marks || {};
-    if (m.r100Center != null) {
-      const cx = X(m.r100Center), cy = Z(0);
-      ctx.fillStyle = COL.engrave;
+    ctx.strokeStyle = COL.engrave;
+    ctx.fillStyle = COL.engrave;
+    ctx.lineWidth = 1;
+    // Tanda titik pusat (R100 pada V1, R25/R50 pada V2)
+    if (m.centerX != null) {
+      const cx = X(m.centerX), cy = Z(0);
       ctx.beginPath();
       ctx.moveTo(cx, cy); ctx.lineTo(cx - 4, cy + 7); ctx.lineTo(cx + 4, cy + 7);
       ctx.closePath();
       ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + 14); ctx.stroke();
       ctx.font = '11px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('pusat R100', cx, cy + 34);
-      ctx.fillText('R100', X(m.r100Center + 72), Z(70));
+      ctx.fillText(m.centerLabel, cx, cy + 34);
     }
-    if (m.angleScale) {
-      ctx.strokeStyle = COL.engrave;
-      ctx.fillStyle = COL.engrave;
+    [m.arcLabel, m.arcLabel2].forEach((l) => {
+      if (!l) return;
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(l.text, X(l.x), Z(l.z));
+    });
+    // Skala sudut terhadap lubang: tanda θ di x = x_lubang + d·tan θ
+    if (m.scale) {
+      const sc = m.scale;
       ctx.font = '10px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.lineWidth = 1;
-      // skala 1° di antara tanda utama
-      const h = UT.IIW.hole50;
-      for (let a = 40; a <= 75; a++) {
-        const x = h.x + h.z * Math.tan(a * DEG);
-        const major = a % 5 === 0;
+      for (let a = sc.from; a <= sc.to; a += sc.minorStep || 1) {
+        const x = sc.hx + sc.hz * Math.tan(a * DEG);
+        if (x < spec.xMin || x > spec.xMax) continue;
+        const lab = sc.labels.includes(a);
         ctx.beginPath();
         ctx.moveTo(X(x), Z(0));
-        ctx.lineTo(X(x), Z(0) + (major ? 9 : 4));
+        ctx.lineTo(X(x), Z(0) + (lab ? 9 : a % 5 === 0 ? 6 : 3.5));
         ctx.stroke();
-        if (major) ctx.fillText(`${a}°`, X(x), Z(0) + 20);
+        if (lab) ctx.fillText(`${a}°`, X(x), Z(0) + 20);
+      }
+    }
+    // Tanda sudut pada busur (V2: sudut berkas dari titik pusat ke busur R50)
+    if (m.arcTicks) {
+      const t = m.arcTicks;
+      ctx.font = '10px system-ui, sans-serif';
+      for (let a = t.from; a <= t.to; a += 5) {
+        const r = a * DEG, sx = Math.sin(r), cz = Math.cos(r);
+        const x1 = t.cx + t.R * sx, z1 = t.R * cz;
+        const x0 = t.cx + (t.R - (t.labels.includes(a) ? 3.5 : 2)) * sx, z0 = (t.R - (t.labels.includes(a) ? 3.5 : 2)) * cz;
+        ctx.beginPath(); ctx.moveTo(X(x0), Z(z0)); ctx.lineTo(X(x1), Z(z1)); ctx.stroke();
+        if (t.labels.includes(a)) {
+          ctx.textAlign = 'right';
+          ctx.fillText(`${a}°`, X(t.cx + (t.R - 5) * sx), Z((t.R - 5) * cz) + 3);
+        }
+      }
+    }
+    // Penggaris mm pada permukaan (V1 sisi B, angka dalam cm seperti pada blok)
+    if (m.ruler) {
+      ctx.font = '10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      for (let x = m.ruler.x0; x <= m.ruler.x1; x += 5) {
+        const major = x % 50 === 0;
+        ctx.beginPath(); ctx.moveTo(X(x), Z(0)); ctx.lineTo(X(x), Z(0) + (major ? 8 : x % 10 === 0 ? 5 : 3)); ctx.stroke();
+        if (major && x > 0) ctx.fillText(String(x / 10), X(x), Z(0) + 32);
       }
     }
   }

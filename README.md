@@ -11,6 +11,17 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 
 ## Fitur
 
+### Blok kalibrasi V1 & V2 (pembaruan)
+- **Blok IIW V1 (ISO 2400 / EN 12223)**, 300 × 100 mm, dengan dua sisi pemindaian:
+  - **Sisi A**: R100 dengan tanda pusat (echo 100 dan 200 mm), lubang Ø50 dekat ujung blok, skala sudut 35°–76°.
+  - **Sisi B**: lubang Ø1,5 berjarak 15 mm dari permukaan untuk cek sudut 70°–80°, dan penggaris 0–20 cm.
+  - Posisi lubang diturunkan dari skala sudut yang terukir pada blok (tanda θ di x = x_lubang + d·tan θ).
+- **Blok V2 (ISO 7963)**:
+  - R25 dan R50 sepusat di permukaan pindai, panjang 75 mm, lubang Ø5 sedalam 20 mm di bawah titik pusat.
+  - Menghadap R25 → echo 25, 100, 175 mm. Menghadap R50 → echo 50, 125, 200 mm.
+  - Skala sudut 35°–65° untuk lubang Ø5, dan tanda sudut pada busur R50.
+  - Blok kecil ini ditujukan untuk probe miniatur, jadi wedge boleh menggantung di tepi blok.
+
 ### v0.5 – Pipa, material austenitik & rekap kelas
 - **Pipa – las girth (keliling)**:
   - OD 114,3–762 mm. Panjang las = keliling π·OD, dengan posisi jam (jam 12 di y = 0).
@@ -85,9 +96,9 @@ Bisa juga di-hosting lewat GitHub Pages: Settings → Pages → Deploy from bran
 ## Alur latihan yang disarankan
 
 1. Tekan **Probe baru (belum dikalibrasi)**.
-2. **Blok IIW**: cari echo R100 maksimum, baca jarak muka depan probe ke tanda pusat R100, lalu isi **X-value**.
-3. Atur **zero** sampai echo R100 tepat di 100 mm (cek echo kedua di 200 mm).
-4. Balik arah berkas ke lubang **Ø50**, cari echo maksimum, baca skala sudut pada tanda index, lalu isi **sudut terukur**.
+2. **Blok IIW V1 sisi A** (atau **V2**): cari echo R100 (V2: R25/R50) maksimum, baca jarak muka depan probe ke tanda pusat, lalu isi **X-value**.
+3. Atur **zero** sampai echo R100 tepat di 100 mm (cek echo kedua di 200 mm). Pada V2: 25/100/175 atau 50/125/200 mm.
+4. Balik arah berkas ke lubang **Ø50** (probe 70°–80°: lubang **Ø1,5** di sisi B; V2: lubang **Ø5**), cari echo maksimum, baca skala sudut pada tanda index, lalu isi **sudut terukur**.
 5. **Blok ASME**: rekam DAC dari SDH ¼T, ½T, ¾T dan lanjut lewat leg 2 (5/4T, 6/4T, 7/4T). Turunkan level gate bila echo lemah.
 6. Tekan **Gain = reference**, lalu **Gain scanning (+6 dB)**.
 7. **Las**: scan dari kedua sisi, evaluasi %DAC, ukur panjang dengan 6 dB drop, pilih interpretasi, dan baca hasil evaluasi.
@@ -121,7 +132,7 @@ src/config.js           konstanta material, probe, default
 src/geometry.js         geometri pelat/las/probe, unfolding, lokasi reflektor
 src/defects.js          skenario cacat & reflektor geometri, noise butir
 src/physics.js          mesin simulasi sinyal A-scan
-src/specimens.js        benda uji: las, blok IIW (V1), blok kalibrasi dasar ASME
+src/specimens.js        benda uji: las/pipa, blok IIW V1 (sisi A/B), blok V2, blok kalibrasi dasar ASME
 src/calibration.js      kebenaran probe tersembunyi, pemetaan zero/velocity, X-value
 src/dac.js              DAC, reference level, evaluasi ASME App. 12
 src/exam.js             soal acak, DAC otomatis, penilaian ujian

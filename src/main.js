@@ -81,9 +81,11 @@
   function defaultProbeX() {
     const tn = Math.tan(H.angle * DEG);
     if (spec.type === 'iiw') {
-      const h = UT.IIW.hole50;
-      return dir() > 0 ? UT.IIW.r100.cx - 25 : h.x + h.z * tn + 18;
+      const sc = spec.marks.scale;
+      if (spec.face === 'B') return dir() > 0 ? 60 : sc.hx + sc.hz * tn + 12;
+      return dir() > 0 ? UT.IIW.r100.cx - 25 : sc.hx + sc.hz * tn + 18;
     }
+    if (spec.type === 'v2') return dir() > 0 ? -6 : 6;
     if (spec.type === 'asme') {
       const xs = UT.ASME_BLOCK.holesX;
       return dir() > 0 ? xs[0] - spec.T * 0.25 * tn - 10 : xs[2] + spec.T * 0.75 * tn + 10;
@@ -252,6 +254,7 @@
     };
 
     sel('inT', 'T', parseFloat, () => { clearDac('tebal benda uji berubah'); resetSizing(); rebuild(); });
+    sel('inFace', 'iiwFace', null, () => { S.probeX = null; rebuild(); });
     fillSelect($('inMaterial'), Object.values(C.materials), (m) => m.name, (m) => m.id);
     fillSelect($('inOD'), C.options.ods, (v) => `${v} mm`);
     $('inMaterial').addEventListener('change', (e) => setMaterial(e.target.value));
@@ -371,6 +374,7 @@
     S.specimen = id;
     if (id === 'las') Object.assign(S, { range: 125, delay: 0, gateStart: 40, gateWidth: 50 });
     if (id === 'iiw') Object.assign(S, { side: 'kiri', range: 250, delay: 0, gateStart: 80, gateWidth: 40 });
+    if (id === 'v2') Object.assign(S, { side: 'kiri', range: 225, delay: 0, gateStart: 35, gateWidth: 30 });
     if (id === 'asme') {
       const r = Math.ceil((S.T * 2.6) / Math.cos(S.angle * DEG) / 25) * 25;
       Object.assign(S, { side: 'kiri', range: Math.max(75, r), delay: 0, gateStart: 5, gateWidth: Math.max(40, r - 10) });
@@ -447,7 +451,9 @@
     $('weldOnly').hidden = !weld;
     $('topWrap').hidden = !weld;
     $('sizingCard').hidden = !weld;
-    $('inT').disabled = S.specimen === 'iiw' || locks.scenario;
+    $('inT').disabled = S.specimen === 'iiw' || S.specimen === 'v2' || locks.scenario;
+    $('lblFace').hidden = S.specimen !== 'iiw';
+    $('inFace').value = S.iiwFace;
     $('inScenario').disabled = !weld || locks.scenario;
     $('randRow').hidden = !weld || S.scenario !== 'acak' || locks.scenario;
     $('inSeed').value = S.randSeed;
@@ -575,7 +581,8 @@
   function updateInfo() {
     if (!spec) return;
     const hs = spec.T * Math.tan(userAngle() * DEG);
-    $('skipInfo').textContent = spec.type === 'iiw' ? 'Tinggi blok 100 mm'
+    $('skipInfo').textContent = spec.type === 'iiw' ? `Blok V1 sisi ${spec.face} · 300 × 100 mm`
+      : spec.type === 'v2' ? 'Blok V2 · R25 & R50 sepusat, lubang Ø5'
       : isTech('tofd') && isWeld() ? `TOFD · PCS = ${(2 * tofdS()).toFixed(1)} mm · ${UT.TOFD.freq} MHz L-wave ${UT.TOFD.angle}°`
         : `½ skip = ${hs.toFixed(1)} mm · 1 skip = ${(2 * hs).toFixed(1)} mm (sudut ${userAngle()}°)`;
     const d = UT.probeDerived({ freq: S.freq, crystal: S.crystal, angle: S.angle, wave: S.wave }, C.material);
@@ -585,7 +592,9 @@
       + (spec.R ? ` · celah tepi wedge ${cp.gap.toFixed(2)} mm, rugi kopling ≈ ${cp.lossDb.toFixed(1)} dB` : '');
     const mat = `${C.material.name} (vL ${C.material.vL}, vT ${C.material.vT} m/s)`;
     $('specInfo').textContent = spec.type === 'iiw'
-      ? `Blok IIW (V1) disederhanakan: tinggi 100 mm, permukaan R100, lubang Ø50, skala sudut 40–75°. ${mat}.`
+      ? `Blok IIW V1 (ISO 2400): 300 × 100 mm, R100, Ø50 (pusat 35 mm dari ujung, 27 mm dari sisi A), Ø1,5 (15 mm dari sisi B). Dimensi lubang diturunkan dari skala sudut pada blok. ${mat}.`
+      : spec.type === 'v2'
+        ? `Blok V2 (ISO 7963): R25 dan R50 sepusat di permukaan pindai, panjang 75 mm, lubang Ø5 sedalam 20 mm di bawah titik pusat. ${mat}.`
       : spec.type === 'asme'
         ? `Tebal blok = T = ${spec.T} mm. SDH Ø${spec.sdhDiameter} mm pada kedalaman ${(spec.T / 4).toFixed(1)}, ${(spec.T / 2).toFixed(1)}, ${(spec.T * 0.75).toFixed(1)} mm.${spec.R ? ` Blok lengkung D = ${spec.OD} mm.` : ''} ${mat}.`
         : spec.isPipe
@@ -596,20 +605,32 @@
   function renderBlockHelp() {
     const el = $('blockHelp');
     let html = '';
-    if (spec.type === 'iiw') {
-      const { xf } = UT.probeExtent(S.probeX, dir(), H);
-      const dFront = dir() * (xf - UT.IIW.r100.cx);
-      const idx = userIndexX();
-      const h = UT.IIW.hole50;
-      let ang = '–';
-      if (dir() < 0 && idx > h.x) ang = `${(Math.atan((idx - h.x) / h.z) / DEG).toFixed(1)}°`;
-      html = `<b>Pembacaan pada blok</b><br>Muka depan probe → tanda pusat R100: <b>${dFront.toFixed(1)} mm</b><br>`
-        + `Skala sudut pada tanda index: <b>${ang}</b>${dir() > 0 ? ' <span class="muted">(arahkan berkas ← ke Ø50)</span>' : ''}<br>`
-        + '<span class="muted">Echo R100 seharusnya di 100 mm dan 200 mm.</span>';
+    const m = spec.marks || {};
+    if (spec.type === 'iiw' || spec.type === 'v2') {
+      const lines = ['<b>Pembacaan pada blok</b>'];
+      if (m.centerX != null) {
+        const { xf } = UT.probeExtent(S.probeX, dir(), H);
+        lines.push(`Muka depan probe → tanda ${spec.type === 'v2' ? 'pusat (0)' : 'pusat R100'}: <b>${(dir() * (xf - m.centerX)).toFixed(1)} mm</b>`);
+      }
+      if (m.scale) {
+        const idx = userIndexX(), sc = m.scale;
+        let ang = '–';
+        if (dir() < 0 && idx > sc.hx) ang = `${(Math.atan((idx - sc.hx) / sc.hz) / DEG).toFixed(1)}°`;
+        const hole = spec.type === 'v2' ? 'Ø5' : spec.face === 'B' ? 'Ø1,5' : 'Ø50';
+        lines.push(`Skala sudut pada tanda index: <b>${ang}</b>${dir() > 0 ? ` <span class="muted">(arahkan berkas ← ke ${hole})</span>` : ''}`);
+      }
+      if (spec.type === 'v2') {
+        lines.push('<span class="muted">Menghadap R25 (berkas ←): echo 25, 100, 175 mm. Menghadap R50 (berkas →): echo 50, 125, 200 mm. Probe miniatur: wedge boleh menggantung di tepi blok.</span>');
+      } else if (spec.face === 'B') {
+        lines.push('<span class="muted">Sisi B: cek sudut 70°–80° dengan lubang Ø1,5 (15 mm dari permukaan). Untuk R100 dan Ø50 pakai sisi A.</span>');
+      } else {
+        lines.push('<span class="muted">Echo R100 seharusnya di 100 mm dan 200 mm. Cek sudut 35°–76° dengan lubang Ø50.</span>');
+      }
+      html = lines.join('<br>');
     } else if (spec.type === 'asme') {
       html = '<span class="muted">Rekam DAC: maksimalkan tiap echo SDH. Gunakan “puncak gate = 80%” hanya untuk titik pertama, lalu jangan ubah gain saat merekam titik berikutnya.</span>';
     } else {
-      html = '<span class="muted">Kalibrasi probe dilakukan di blok IIW, DAC di blok kalibrasi ASME.</span>';
+      html = '<span class="muted">Kalibrasi probe dilakukan di blok IIW V1 atau V2, DAC di blok kalibrasi ASME.</span>';
     }
     if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
   }

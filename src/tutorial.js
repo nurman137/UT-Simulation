@@ -90,7 +90,7 @@
       title: '2. Kalibrasi probe di blok IIW',
       desc: 'Menemukan probe index, mengatur zero, dan mengecek sudut probe.',
       setup(app) {
-        baseSetup(app, { showDefects: false });
+        baseSetup(app, { showDefects: false, iiwFace: 'A' });
         app.training = true;
         app.newProbe(true);
         app.S.specimen = 'x';
@@ -125,7 +125,7 @@
         },
         {
           title: 'Arahkan ke lubang Ø50',
-          text: 'Klik “← kiri” agar berkas mengarah ke lubang Ø50. Atur gate sekitar 60–160 mm. Echo dari lubang besar ini lemah: naikkan gain (mis. +12 dB) sampai terlihat jelas, lalu cari posisi probe dengan echo lubang yang maksimum.',
+          text: 'Klik “← kiri” agar berkas mengarah ke lubang Ø50 (dekat ujung kiri blok). Atur gate sekitar 10–60 mm. Echo dari lubang besar ini lemah: naikkan gain (mis. +12 dB) sampai terlihat jelas, lalu cari posisi probe dengan echo lubang yang maksimum.',
           hint: 'Untuk probe 60° posisinya sekitar skala 60° pada blok. Yang dicari adalah posisi puncak, bukan tinggi absolutnya.',
           check: (app, pk) => {
             const h = UT.IIW.hole50;

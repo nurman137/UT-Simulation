@@ -21,7 +21,8 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Kurva DAC 100/50/20%, reference level (80% FSH), gain scanning (+6 dB)
 - [x] Pembacaan %DAC dan evaluasi ASME Sec. VIII Div. 1 App. 12
 - [x] Tampak atas + panjang cacat sepanjang las; sizing panjang dan tinggi 6 dB drop
-- [ ] Blok V2 (R25/R50) — ditunda; kalibrasi range sudah tercakup oleh R100 IIW
+- [x] Blok V2 (ISO 7963): R25/R50 sepusat, lubang Ø5, echo 25/100/175 dan 50/125/200 mm
+- [x] Blok V1 mengikuti tata letak ISO 2400: Ø50 dekat ujung, sisi B dengan Ø1,5 (70°–80°)
 - [ ] Koreksi transfer — ditunda
 
 ## v0.3 – Mode edukasi ✅

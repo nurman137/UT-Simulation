@@ -17,17 +17,29 @@
 
   UT.SPECIMENS = [
     { id: 'las', name: 'Las (benda uji)' },
-    { id: 'iiw', name: 'Blok IIW (V1)' },
+    { id: 'iiw', name: 'Blok IIW V1' },
+    { id: 'v2', name: 'Blok V2' },
     { id: 'asme', name: 'Blok kalibrasi dasar ASME' },
   ];
 
-  // Dimensi blok IIW (V1) yang disederhanakan untuk simulasi 2D
+  // Blok IIW V1 (ISO 2400 / EN 12223), 300 × 100 mm. Posisi lubang diturunkan dari skala sudut
+  // yang terukir: tanda sudut θ berada di x = x_lubang + d·tan θ (d = kedalaman pusat lubang).
   UT.IIW = {
     length: 300,
     T: 100,
-    r100: { cx: 200, R: 100 }, // titik pusat R100 di permukaan atas
-    hole50: { x: 80, z: 70, r: 25 }, // lubang Ø50 untuk cek sudut
-    angleScale: [40, 45, 50, 55, 60, 65, 70, 75],
+    r100: { cx: 200, R: 100 }, // titik pusat R100 di sisi A (permukaan atas)
+    hole50: { x: 35, z: 27, r: 25 }, // Ø50 diukur dari sisi A
+    hole15: { x: 30, zB: 15, r: 0.75 }, // Ø1,5 berjarak 15 mm dari sisi B
+    scaleA: { from: 35, to: 76, labels: [50, 60, 70, 76] }, // terhadap Ø50, dipakai dari sisi A
+    scaleB: { from: 70, to: 80, labels: [74, 80] }, // terhadap Ø1,5, dipakai dari sisi B
+  };
+
+  // Blok V2 (ISO 7963): R25 dan R50 berpusat di satu titik pada permukaan pindai, lubang Ø5.
+  UT.V2 = {
+    R1: 25, R2: 50,
+    hole: { x: 0, z: 20, r: 2.5 },
+    scale: { from: 35, to: 68, labels: [35, 40, 50, 60, 65] }, // terhadap Ø5
+    arcTicks: { from: 40, to: 70, labels: [50, 60, 70] }, // tanda sudut pada busur R50
   };
 
   /** Diameter SDH blok kalibrasi dasar ASME berdasarkan tebal las (ASME Sec. V Art. 4, Fig. T-434.2.1). */
@@ -41,6 +53,8 @@
 
   /** Batas posisi exit point probe. body = {front, back} jarak exit point ke depan/belakang wedge. */
   UT.specimenProbeLimits = function (spec, dir, body) {
+    // Blok kecil (V2) dirancang untuk probe miniatur: wedge boleh menggantung, exit point tetap di permukaan
+    if (spec.overhang) return { min: spec.xMin + 1, max: spec.xMax - 1 };
     let lo = spec.xMin + (dir > 0 ? body.back : body.front);
     let hi = spec.xMax - (dir > 0 ? body.front : body.back);
     if (spec.type === 'las' && spec.weld.capH > 0) {
@@ -84,28 +98,44 @@
     return spec;
   }
 
-  function buildIIW() {
+  /** Balik geometri blok (sisi B menjadi permukaan pindai): z → T − z. */
+  function flipZ(spec) {
+    const T = spec.T;
+    spec.scene.points.forEach((p) => { p.z = T - p.z; p.nz = -p.nz; });
+    spec.scene.corners.forEach((c) => { c.z = T - c.z; });
+    spec.outline = spec.outline.map(([x, z]) => [x, T - z]);
+    spec.holes.forEach((h) => { h.z = T - h.z; });
+  }
+
+  // Permukaan busur berpusat (cx, 0) jari-jari R, dari sudut a0 ke a1 (diukur dari vertikal, arah +x positif).
+  // Normal mengarah ke titik pusat. rep: echo berulang lewat titik pusat.
+  function arcPoints(points, cx, R, a0, a1, rep) {
+    const pts = [];
+    const n = Math.max(40, Math.round((Math.abs(a1 - a0) * R) / 0.5));
+    for (let k = 0; k <= n; k++) {
+      const a = (a0 + ((a1 - a0) * k) / n) * (Math.PI / 180);
+      pts.push([cx + R * Math.sin(a), R * Math.cos(a)]);
+    }
+    const before = points.length;
+    UT.samplePolyline(points, pts, { two: false, refl: 1, rep });
+    for (let i = before; i < points.length; i++) {
+      const p = points[i];
+      const dx = cx - p.x, dz = -p.z, L = Math.hypot(dx, dz);
+      p.nx = dx / L; p.nz = dz / L;
+    }
+    return pts;
+  }
+
+  function buildIIW(face) {
     const B = UT.IIW;
     const points = [];
     const { cx, R } = B.r100;
-    // Permukaan lengkung R100 (normal mengarah ke titik pusat). Pantulan berulang 100, 200 mm
-    // terjadi karena gelombang kembali ke titik pusat lalu dipantulkan celah di sisi blok.
-    const arc = [];
-    const nArc = 200;
-    for (let k = 0; k <= nArc; k++) {
-      const a = (Math.PI / 2) * (k / nArc);
-      arc.push([cx + R * Math.cos(a), R * Math.sin(a)]);
-    }
-    const before = points.length;
-    UT.samplePolyline(points, arc, { two: false, refl: 1, rep: { n: 2, step: R, decay: 0.35 } });
-    for (let i = before; i < points.length; i++) {
-      const p = points[i];
-      const dx = cx - p.x, dz = 0 - p.z, L = Math.hypot(dx, dz);
-      p.nx = dx / L; p.nz = dz / L;
-    }
-    // Lubang Ø50
-    const h = B.hole50;
+    // Permukaan lengkung R100. Echo berulang 100, 200 mm: gelombang kembali ke titik pusat
+    // lalu dipantulkan oleh celah di kedua sisi blok tepat di titik pusat.
+    arcPoints(points, cx, R, 0, 90, { n: 2, step: R, decay: 0.35 });
+    const h = B.hole50, h2 = B.hole15;
     UT.sampleCircle(points, h.x, h.z, h.r, { refl: 1 });
+    UT.sampleCircle(points, h2.x, B.T - h2.zB, Math.max(h2.r, 0.75), { refl: 1 });
 
     const corners = [];
     [0, B.T].forEach((z) => corners.push({ x: 0, z, s: B.T, face: 1, kind: 'ujung' }));
@@ -118,13 +148,56 @@
     outline.push([0, B.T]);
 
     const spec = {
-      type: 'iiw', name: 'Blok IIW (V1)', T: B.T, xMin: 0, xMax: B.length, yLen: null,
+      type: 'iiw', face: face === 'B' ? 'B' : 'A',
+      name: `Blok IIW V1 – sisi ${face === 'B' ? 'B' : 'A'}`, T: B.T, xMin: 0, xMax: B.length, yLen: null,
       scene: { points, corners, shapes: { polys: [], circles: [], gaps: [] }, ipRanges: [], truth: [], rootBead: false },
       outline,
-      holes: [{ x: h.x, z: h.z, r: h.r, label: 'Ø50' }],
-      marks: { r100Center: cx, angleScale: B.angleScale.map((a) => ({ a, x: h.x + h.z * Math.tan((a * Math.PI) / 180) })) },
+      holes: [{ x: h.x, z: h.z, r: h.r, label: 'Ø50' }, { x: h2.x, z: B.T - h2.zB, r: h2.r, label: 'Ø1,5' }],
     };
+    if (spec.face === 'B') {
+      flipZ(spec);
+      spec.marks = {
+        scale: { hx: h2.x, hz: h2.zB, from: B.scaleB.from, to: B.scaleB.to, labels: B.scaleB.labels, minorStep: 1 },
+        ruler: { x0: 0, x1: 200 },
+        arcLabel: { text: 'R100', x: cx + 72, z: 30 },
+      };
+    } else {
+      spec.marks = {
+        centerX: cx, centerLabel: 'pusat R100',
+        scale: { hx: h.x, hz: h.z, from: B.scaleA.from, to: B.scaleA.to, labels: B.scaleA.labels, minorStep: 1 },
+        arcLabel: { text: 'R100', x: cx + 72, z: 70 },
+      };
+    }
     spec.grain = UT.buildGrain(spec, 99);
+    return spec;
+  }
+
+  function buildV2() {
+    const B = UT.V2;
+    const points = [];
+    // Menghadap R25: 25, 100, 175 mm · menghadap R50: 50, 125, 200 mm (selisih 75 = 25 + 50)
+    const rep = { n: 2, step: B.R1 + B.R2, decay: 0.35 };
+    const a25 = arcPoints(points, 0, B.R1, 0, -90, rep);
+    const a50 = arcPoints(points, 0, B.R2, 0, 90, rep);
+    UT.sampleCircle(points, B.hole.x, B.hole.z, B.hole.r, { refl: 1 });
+    const outline = [[-B.R1, 0], [B.R2, 0]];
+    a50.slice().reverse().forEach((p) => outline.push(p)); // (50,0) → (0,50)
+    outline.push([0, B.R1]);
+    a25.slice(1).reverse().forEach((p) => outline.push(p)); // (0,25) → (−25,0)
+    const spec = {
+      type: 'v2', name: 'Blok V2 (ISO 7963)', T: B.R2, xMin: -B.R1, xMax: B.R2, yLen: null, overhang: true,
+      scene: { points, corners: [], shapes: { polys: [], circles: [], gaps: [] }, ipRanges: [], truth: [], rootBead: false },
+      outline,
+      holes: [{ x: B.hole.x, z: B.hole.z, r: B.hole.r, label: 'Ø5' }],
+      marks: {
+        centerX: 0, centerLabel: '0',
+        scale: { hx: B.hole.x, hz: B.hole.z, from: B.scale.from, to: B.scale.to, labels: B.scale.labels, minorStep: 1 },
+        arcTicks: { cx: 0, R: B.R2, from: B.arcTicks.from, to: B.arcTicks.to, labels: B.arcTicks.labels },
+        arcLabel: { text: 'R50', x: 30, z: 33 },
+        arcLabel2: { text: 'R25', x: -17, z: 12 },
+      },
+    };
+    spec.grain = UT.buildGrain(spec, 77);
     return spec;
   }
 
@@ -169,7 +242,8 @@
   UT.curvedBlockOk = (odSurface, odBlock) => odBlock != null && odSurface >= 0.9 * odBlock && odSurface <= 1.5 * odBlock;
 
   UT.buildSpecimen = function (S) {
-    if (S.specimen === 'iiw') return buildIIW();
+    if (S.specimen === 'iiw') return buildIIW(S.iiwFace);
+    if (S.specimen === 'v2') return buildV2();
     if (S.specimen === 'asme') return buildASME(S.T, S.asmeCurved ? S.OD : null);
     return buildWeldSpecimen(S);
   };
