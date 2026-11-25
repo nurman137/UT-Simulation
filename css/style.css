@@ -370,3 +370,4 @@ input[type="range"] { width: 100%; }
 .seg .btn.on { background: #7b2cbf; color: #fff; border-color: #7b2cbf; }
 .delaylaw { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
 .delaylaw svg { background: #f4effa; border-radius: 4px; }
+.planrow label.grow { flex: 1 1 260px; } .planrow label.grow input[type="range"] { width: 100%; }

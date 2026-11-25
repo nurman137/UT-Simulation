@@ -49,6 +49,10 @@
       x1 = Math.min(spec.xMax + 8, x1);
       return { x0, x1, z0, z1 };
     }
+    if (spec.type === 'tubular') {
+      const e = UT.probeExtent(state.probeX, dir, H);
+      return { x0: Math.min(-90, Math.min(e.xf, e.xb) - 10), x1: 45, z0: Math.min(z0, -40), z1: spec.T + 35 };
+    }
     if (spec.type !== 'las') {
       return { x0: spec.xMin - 8, x1: spec.xMax + 8, z0, z1 };
     }
@@ -106,12 +110,13 @@
     const dc = o.seamR ? seamProxy(ctx, v, o.seamR) : ctx;
     if (o.spec.type === 'las') drawWeld(dc, v, o, X, Z);
     else if (o.spec.type === 'korosi') drawKorosi(ctx, v, o, X, Z);
+    else if (o.spec.type === 'tubular') UT.drawTubularSection(ctx, v, o, X, Z);
     else drawBlock(ctx, v, o, X, Z);
 
     drawScale(dc, v, X, Z, o.spec);
 
     if (o.coverage) drawCoverage(ctx, o.coverage, X, Z);
-    if (o.state.showDefects && (o.spec.type === 'las' || o.spec.type === 'par')) drawDefects(dc, o.spec.scene, X, Z, o.state.probeY);
+    if (o.state.showDefects && (o.spec.type === 'las' || o.spec.type === 'par' || o.spec.type === 'tubular')) drawDefects(dc, o.spec.scene, X, Z, o.state.probeY);
 
     if (o.technique === 'tofd') {
       drawTofd(ctx, o, X, Z);

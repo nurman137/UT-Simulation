@@ -21,6 +21,7 @@
     { id: 'v2', name: 'Blok V2' },
     { id: 'asme', name: 'Blok kalibrasi dasar ASME' },
     { id: 'korosi', name: 'Pelat korosi' },
+    { id: 'tubular', name: 'Sambungan tubular' },
   ];
 
   // Blok IIW V1 (ISO 2400 / EN 12223), 300 × 100 mm. Posisi lubang diturunkan dari skala sudut
@@ -338,6 +339,7 @@
     if (S.specimen === 'v2') return buildV2(S.v2Face);
     if (S.specimen === 'asme') return buildASME(S.T, S.asmeCurved ? S.OD : null);
     if (S.specimen === 'korosi') return UT.buildKorosi(S.T, S.korosiSeed || 2468);
+    if (S.specimen === 'tubular') return UT.buildTubularSpec(S);
     return buildWeldSpecimen(S);
   };
 })(typeof window !== 'undefined' ? window : globalThis);

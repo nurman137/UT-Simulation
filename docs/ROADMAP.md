@@ -78,6 +78,15 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Tampilan bahasa Inggris
 - [x] Tutorial 12–15
 
+## v0.9 – Sambungan tubular T, Y, K, X ✅
+- [x] Geometri 3D perpotongan brace–chord, sudut dihedral lokal Ψ, zona heel/sisi/toe
+- [x] Penampang lokal per posisi keliling φ + penelusur sinar dengan pantulan di semua permukaan bebas
+- [x] T, Y, K (gap, brace kedua di daerah heel), X (brace di sisi bawah chord)
+- [x] Tampilan 3D (pilih φ dengan klik), B-scan keliling brace, skenario cacat tubular
+- [x] Tutorial 16–17
+- [ ] Kriteria penerimaan tubular AWS D1.1 Class R / Class X — perlu tabel dari dokumen resmi
+- [ ] Skew berkas 3D & kelengkungan chord di penampang lokal — ditunda
+
 ## v1.0
 - [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III
 - [ ] Rilis di GitHub Pages

@@ -25,6 +25,7 @@
     S._angleBefore = null;
     S.dual = false;
     Object.assign(S, { seam: false, aniso: true, pautMode: 'S', pautFocus: 0, pautBeam: 24, pautEAngle: 60 });
+    Object.assign(S, { tubType: 'Y', tubD: 323.9, tubTc: 16, tubd: 168.3, tubTb: 10, tubTheta: 45, tubGap: 25, tubScenario: 'lof-brace' });
     S.plan = Object.assign({}, UT.CONFIG.defaults.plan, { on: false });
   }
 
@@ -780,6 +781,100 @@
         {
           title: 'Selesai',
           text: 'Kelas A ditolak; kelas B dan C ditolak bila panjangnya melebihi batas; kelas D diterima. Tabel di simulator disusun untuk edukasi – selalu gunakan tabel dari edisi AWS D1.1 yang berlaku.',
+        },
+      ],
+    },
+    {
+      id: 'tubular',
+      title: '16. Sambungan tubular: sudut dihedral & zona',
+      desc: 'Sudut dihedral lokal Ψ yang berubah di sekeliling brace, zona heel/sisi/toe, dan pemilihan sudut probe.',
+      setup(app) {
+        baseSetup(app, { scenario: 'none', showDefects: true, angle: 60, T: 10 });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('tubular');
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Sambungan Y',
+          text: 'Brace Ø168 × 10 dilas pada chord Ø324 × 16 dengan sudut θ = 45°. Di bawah penampang: tampilan 3D; titik merah = posisi keliling φ yang sedang diperiksa. Penampang di atas adalah penampang lokal di φ itu: probe di permukaan brace, berkas menuju las dan chord.',
+        },
+        {
+          title: 'Ke daerah toe',
+          text: 'Pindahkan posisi keliling ke toe (φ = 180°) dengan tombol 180°, slider φ, atau klik garis las pada tampilan 3D. Perhatikan bentuk las dan chord berubah.',
+          check: (app) => app.tub && Math.abs(app.tub.phi - 180) < 10,
+        },
+        {
+          title: 'Sudut dihedral di toe',
+          text: 'Sudut dihedral lokal Ψ adalah sudut antara permukaan luar brace dan chord. Di toe sudutnya lancip sehingga alur las sempit dan sulit diperiksa. Berapa Ψ di posisi ini?',
+          quiz: { label: 'Ψ', unit: '°', check: (v, app) => app.tub && Math.abs(v - app.tub.psi) <= 2 },
+        },
+        {
+          title: 'Ke daerah heel',
+          text: 'Kembali ke heel (φ = 0°). Di sini Ψ tumpul (180° − θ). Lihat baris info di atas penampang: sudut ideal untuk muka bevel brace dan muka chord.',
+          check: (app) => app.tub && (app.tub.phi < 10 || app.tub.phi > 350),
+        },
+        {
+          title: 'Pilih sudut probe',
+          text: 'Muka bevel brace di heel paling baik diperiksa dengan berkas yang tegak lurus padanya. Ganti sudut probe ke 45° (sudut ideal untuk muka bevel lewat leg 2).',
+          check: (app) => app.S.angle === 45,
+        },
+        {
+          title: 'Temukan LOF',
+          text: 'Pilih skenario cacat “LOF sisi brace (daerah heel)” pada kartu Sambungan tubular, lalu geser probe (← →) sampai echo LOF ≥ 60% FSH.',
+          hint: 'Berkas harus memantul sekali di permukaan dalam brace (leg 2) sebelum mengenai muka bevel. Atur gain bila perlu.',
+          check: (app, pk) => app.S.tubScenario === 'lof-brace' && pk && pk.triggered && pk.amp >= 60,
+        },
+        {
+          title: 'Selesai',
+          text: 'Pada sambungan tubular, Ψ berubah terus di sekeliling brace sehingga bentuk alur, sudut probe terbaik, dan jarak probe juga berubah. Prosedur UT tubular membagi keliling menjadi zona (heel, sisi, toe) dan memakai sudut probe yang berbeda untuk tiap zona.',
+        },
+      ],
+    },
+    {
+      id: 'tubk',
+      title: '17. Sambungan K & X: scan keliling brace',
+      desc: 'B-scan keliling brace untuk menemukan posisi indikasi, daerah gap pada K, dan sambungan X.',
+      setup(app) {
+        baseSetup(app, { scenario: 'none', showDefects: true, angle: 45, T: 10 });
+        Object.assign(app.S, { tubType: 'K', tubScenario: 'campuran' });
+        app.training = false;
+        app.newProbe(false);
+        app.S.specimen = 'x';
+        app.setSpecimen('tubular');
+        app.syncControls();
+      },
+      steps: [
+        {
+          title: 'Sambungan K',
+          text: 'Dua brace bertemu di chord dengan gap di antaranya (lihat tampilan 3D). Las berisi beberapa cacat di posisi keliling yang berbeda. Di penampang dekat heel (φ ≈ 0°) brace kedua terlihat di seberang gap.',
+        },
+        {
+          title: 'B-scan keliling',
+          text: 'Tekan “Rekam keliling brace (φ)” di atas A-scan. Probe tetap pada jarak yang sama dari las sementara posisi keliling disapu 0–360°. Tunggu sampai selesai.',
+          check: (app) => app.imgKind === 'bscan' && app.imgDone,
+        },
+        {
+          title: 'Retak kaki las',
+          text: 'Pindah ke daerah sisi (sekitar φ = 90°) dan cari echo retak kaki las sisi brace ≥ 40% FSH (atur jarak probe dan gain).',
+          hint: 'Retak berawal di kaki las pada permukaan brace; bersama permukaan itu membentuk corner trap yang terlihat lewat leg 2 (probe 45° paling kuat).',
+          check: (app, pk) => app.tub && Math.abs(app.tub.phi - 90) < 25 && pk && pk.triggered && pk.amp >= 40,
+        },
+        {
+          title: 'Posisi keliling',
+          text: 'Catat posisi keliling indikasi: dalam laporan tubular, lokasi dinyatakan dengan φ (atau posisi jam) di sekeliling brace.',
+          quiz: { label: 'φ', unit: '°', check: (v, app) => app.tub && Math.abs(v - app.tub.phi) <= 10 },
+        },
+        {
+          title: 'Sambungan X',
+          text: 'Ganti jenis sambungan menjadi X. Brace kedua kini berada di sisi bawah chord dan diperiksa terpisah dengan cara yang sama; penampang lokal brace atas tidak berubah.',
+          check: (app) => app.S.tubType === 'X',
+        },
+        {
+          title: 'Selesai',
+          text: 'Pada sambungan tubular, scan dilakukan di seluruh keliling setiap brace dengan sudut probe sesuai zona. Lokasi indikasi dicatat sebagai posisi keliling φ, jarak dari kaki las, dan kedalaman.',
         },
       ],
     },

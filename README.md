@@ -16,6 +16,18 @@ berkas (`file://`) aplikasi juga jalan, tetapi tanpa fitur pasang/offline otomat
 
 ## Fitur
 
+### v0.9 – Sambungan tubular T, Y, K, X
+- Benda uji baru **Sambungan tubular**: chord & brace (OD, tebal), sudut brace θ, gap K, brace di sisi bawah untuk X.
+- **Geometri 3D**: perpotongan brace–chord dihitung tepat; **sudut dihedral lokal Ψ** berubah di sekeliling brace
+  (heel 180° − θ, toe θ, saddle 180° − acos β pada T). Tampilan 3D: klik garis las untuk memilih posisi keliling φ.
+- **Penampang lokal** di setiap φ: brace, alur las (bevel menyesuaikan Ψ), dan chord; berkas ditelusuri dengan pantulan
+  di semua permukaan bebas; brace kedua K muncul di daerah gap. Sudut probe ideal untuk muka bevel brace dan muka chord.
+- Skenario cacat tubular: LOF sisi brace (heel), LOF sisi chord (sisi), akar tidak tertembus (toe), retak kaki las sisi
+  brace, porositas, campuran. **B-scan keliling brace** (φ 0–360°).
+- **Tutorial 16–17**: sudut dihedral & zona; sambungan K & X dengan scan keliling.
+- Batasan: chord dianggap lurus secara lokal, tanpa skew berkas 3D; kriteria tubular AWS Class R/X belum dimasukkan
+  (evaluasi memakai %DAC ASME atau rating AWS).
+
 ### v0.8 – Ujian praktik, AWS D1.1, PAUT lanjutan, korosi, pipa seam, anisotropi, bahasa Inggris
 - **Ujian praktik lengkap**: probe dengan galat tersembunyi (ditentukan kode soal), kalibrasi, DAC, gain scanning,
   scan, dan laporan. Nilai akhir = 70% laporan + 30% proses (kalibrasi 40, DAC 40, gain scanning 20); proses ikut
@@ -187,6 +199,8 @@ src/exam.js             soal acak, DAC otomatis, penilaian ujian
 src/scanplan.js         rencana scan: peta cakupan zona las + HAZ, jarak skip
 src/raypath.js          lintasan berkas umum: pipa seam (anulus), pembelokan berkas las austenitik
 src/corrosion.js        pelat korosi, probe dual (TR), A-scan permukaan bawah tidak rata, tebal echo pertama
+src/tubular.js          sambungan tubular T/Y/K/X: geometri 3D, Ψ lokal, penampang lokal, penelusur sinar, cacat
+src/render-tubular.js   tampilan 3D sambungan dan penampang lokal
 src/i18n.js             pilihan bahasa (kamus, pola, frasa; DOM, kanvas, dialog, laporan)
 src/i18n-lessons-en.js  terjemahan Inggris pelajaran tutorial
 src/imaging.js          B-scan, S-scan Phased Array, simulasi TOFD, akuisisi progresif
