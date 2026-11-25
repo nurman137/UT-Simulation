@@ -57,6 +57,18 @@
     return 0.5 * (UT.erf(k * (y2 - yp)) - UT.erf(k * (y1 - yp)));
   };
 
+
+  /**
+   * Tabel pulsa (Gaussian × cos) dengan resolusi dsp/16 agar penjumlahan echo tidak menghitung
+   * exp & cos untuk setiap sampel (galat fase < 0,03 rad).
+   */
+  UT.pulseTable = function (win, dsp, invTau2, kw) {
+    const h = dsp / 16, m = Math.ceil(win / h);
+    const K = new Float32Array(2 * m + 1);
+    for (let i = -m; i <= m; i++) { const u = i * h; K[i + m] = Math.exp(-u * u * invTau2) * Math.cos(kw * u); }
+    return { K, m, inv: 1 / h };
+  };
+
   /** Atenuasi satu arah (dB/mm) gelombang geser di baja karbon, naik terhadap frekuensi. */
   UT.attenDbPerMm = (fMHz) => 0.0045 * Math.pow(fMHz, 1.4);
 
@@ -109,6 +121,7 @@
     const maxLeg = Math.min(12, Math.ceil(((spEnd + win) * Math.cos(Math.max(0, th - 4 * d.gamma6))) / T) + 1);
 
     const dualP = probe.dual && Math.abs(probe.angle) < 1 && UT.dualGain;
+    const PT = UT.pulseTable(win, dsp, invTau2, kw), PK = PT.K, PM = PT.m, PI = PT.inv;
     function add(r, a) {
       if (dualP && r > 0) { a *= UT.dualGain(r); r = UT.dualPath(r); }
       if (r + win < spStart || r - win > spEnd) return;
@@ -117,8 +130,8 @@
       if (j0 < 0) j0 = 0;
       if (j1 > n - 1) j1 = n - 1;
       for (let j = j0; j <= j1; j++) {
-        const u = spStart + j * dsp - r;
-        re[j] += a * Math.exp(-u * u * invTau2) * Math.cos(kw * u);
+        const k = Math.round((spStart + j * dsp - r) * PI) + PM;
+        if (k >= 0 && k < PK.length) re[j] += a * PK[k];
       }
     }
 

@@ -371,3 +371,19 @@ input[type="range"] { width: 100%; }
 .delaylaw { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
 .delaylaw svg { background: #f4effa; border-radius: 4px; }
 .planrow label.grow { flex: 1 1 260px; } .planrow label.grow input[type="range"] { width: 100%; }
+.custombox { border: 1px dashed #c9d3dd; border-radius: 8px; padding: 8px; margin: 6px 0 10px; }
+.custombox input[type="number"] { width: 70px; }
+.custombox select { max-width: 190px; }
+.examopts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 6px 0; }
+.examopts select, .examopts input { max-width: 220px; }
+.brand h1.brandname { display: inline; font-size: 17px; margin: 0; font-weight: 700; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.guidelinks { margin: 0 0 8px; }
+.tablewrap { position: relative; } /* elemen sr-only di dalam tabel tidak melebarkan halaman */
+@media (max-width: 720px) {
+  .examsetup { grid-template-columns: minmax(0, 1fr); }
+  .examopts select, .examopts input, #exPack { max-width: 100%; min-width: 0; }
+  .lvl { min-width: 0; }
+}
+.examsetup > div { min-width: 0; }
+#exPack { width: 100%; max-width: 320px; }

@@ -14,17 +14,20 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <strong>Simulator UT Las</strong>
-      <span class="ver">v0.9 · acuan ASME Sec. V Art. 4</span>
+      <h1 class="brandname">Simulator UT Las</h1>
+      <span class="ver">v1.0 · acuan ASME Sec. V Art. 4</span>
     </div>
     <span class="btnrow topbtns">
       <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
       <button id="btnAbout" class="btn" type="button" aria-expanded="false" aria-controls="about">Tentang</button>
+      <button id="btnSave" class="btn" type="button" title="Simpan pengaturan, kalibrasi, DAC, dan laporan ke file">Simpan sesi</button>
+      <button id="btnOpen" class="btn" type="button" title="Buka sesi tersimpan">Buka sesi</button>
+      <input type="file" id="inSession" accept=".json,application/json" hidden>
       <button id="btnLang" class="btn" type="button" title="Bahasa / Language">EN</button>
     </span>
   </header>
 
-  <section id="about" class="help" hidden>
+  <section id="about" class="help" hidden aria-label="Tentang simulator">
     <div class="help-cols">
       <div>
         <h3>Simulator UT Las <span id="aboutVer"></span></h3>
@@ -36,6 +39,7 @@
           <li>Kalibrasi dengan blok IIW V1 (dua sisi), V2 (sisi atas & miring), dan blok kalibrasi dasar ASME (DAC/TCG).</li>
           <li>Scan tegak lurus dan sejajar las; 14 jenis skenario cacat (termasuk laminasi logam induk) + cacat acak; rencana scan & peta cakupan.</li>
           <li>Evaluasi menurut ASME Sec. VIII Div. 1 App. 12 atau AWS D1.1, tutorial 17 pelajaran, ujian (termasuk ujian praktik lengkap) &amp; rekap kelas. Bisa dipakai tanpa internet setelah sekali dibuka lewat http(s). Tampilan bahasa Indonesia atau Inggris.</li>
+          <li>Alat instruktur: ujian di pelat, pipa, dan sambungan tubular dengan batas waktu dan kode paket ujian; editor skenario cacat; laporan inspeksi format standar; simpan &amp; buka sesi.</li>
         </ul>
       </div>
       <div>
@@ -54,7 +58,8 @@
     </div>
   </section>
 
-  <section id="help" class="help" hidden>
+  <section id="help" class="help" hidden aria-label="Cara pakai">
+    <p class="small guidelinks"><b>Panduan lengkap:</b> <a href="docs/panduan.html" target="_blank" rel="noopener">Panduan (HTML)</a> · <a href="docs/Panduan-Simulator-UT-Las-v1.0.pdf" target="_blank" rel="noopener">PDF</a> · <a href="docs/guide-en.html" target="_blank" rel="noopener">English guide</a> · <a href="docs/Weld-UT-Simulator-Guide-v1.0.pdf" target="_blank" rel="noopener">PDF (EN)</a></p>
     <div class="help-cols">
       <div>
         <h3>Dasar</h3>
@@ -94,7 +99,7 @@
     </div>
   </nav>
 
-  <section id="eduPanel" class="edupanel" hidden aria-live="polite"></section>
+  <section id="eduPanel" class="edupanel" hidden aria-live="polite" aria-label="Panel aktivitas"></section>
 
   <nav class="modebar" aria-label="Benda uji">
     <span class="modebar-label">Benda uji:</span>
@@ -156,7 +161,7 @@
     </section>
   </main>
 
-  <section class="controls">
+  <section class="controls" aria-label="Pengaturan">
     <fieldset class="card">
       <legend>Benda uji</legend>
       <label>Material
@@ -397,10 +402,26 @@
           <button type="button" id="btnRepDownload" class="btn">Unduh laporan (.html)</button>
         </div>
       </div>
+      <details class="repinfo">
+        <summary class="small"><b>Data laporan</b> (proyek, prosedur, peralatan – tampil di laporan cetak)</summary>
+        <div class="planrow" id="repInfo">
+          <label>Proyek / klien <input data-ri="proyek" type="text" maxlength="80"></label>
+          <label>No. laporan <input data-ri="noLaporan" type="text" maxlength="40"></label>
+          <label>Lokasi pemeriksaan <input data-ri="lokasi" type="text" maxlength="60"></label>
+          <label>Level pemeriksa <input data-ri="level" type="text" maxlength="30" placeholder="mis. UT Level II"></label>
+          <label>No. prosedur <input data-ri="noProsedur" type="text" maxlength="40"></label>
+          <label>Identitas benda uji / no. sambungan <input data-ri="idBenda" type="text" maxlength="60"></label>
+          <label>Flaw detector (merk/tipe) <input data-ri="alat" type="text" maxlength="60"></label>
+          <label>No. seri alat <input data-ri="noSeri" type="text" maxlength="40"></label>
+          <label>Couplant <input data-ri="couplant" type="text" maxlength="40" placeholder="mis. gel selulosa"></label>
+          <label>Kondisi permukaan <input data-ri="permukaan" type="text" maxlength="60" placeholder="mis. digerinda"></label>
+          <label>Suhu permukaan (°C) <input data-ri="suhu" type="text" maxlength="10"></label>
+        </div>
+      </details>
       <p class="muted small">“Tambah dari pembacaan” mengambil ujung-ujung hasil sizing (atau posisi probe), kedalaman, posisi, dan %DAC dari puncak gate, serta interpretasi yang dipilih. Semua kolom bisa diedit.</p>
       <div class="tablewrap">
         <table class="reptable">
-          <thead><tr><th>#</th><th>y awal</th><th>y akhir</th><th>Panjang</th><th>Kedalaman</th><th>Posisi x</th><th>%DAC</th><th>Interpretasi</th><th>Keputusan</th><th>Catatan</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>y awal</th><th>y akhir</th><th>Panjang</th><th>Kedalaman</th><th>Posisi x</th><th>%DAC</th><th>Interpretasi</th><th>Keputusan</th><th>Catatan</th><th><span class="sr-only">Aksi</span></th></tr></thead>
           <tbody id="repBody"></tbody>
         </table>
       </div>
@@ -447,6 +468,24 @@
         <button type="button" id="btnReroll" class="btn">Acak ulang</button>
       </div>
       <p id="scenarioDesc" class="desc"></p>
+      <div id="customBox" class="custombox" hidden>
+        <b class="small">Editor skenario instruktur</b>
+        <div class="tablewrap"><table class="reptable small" id="customTable">
+          <thead><tr><th>Jenis</th><th>Sisi</th><th>y awal</th><th>y akhir</th><th>Kedalaman atas</th><th>Kedalaman bawah</th><th>x (mm)</th><th><span class="sr-only">Aksi</span></th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+        <div class="btnrow">
+          <button type="button" class="btn" id="btnCustAdd">+ Tambah cacat</button>
+          <button type="button" class="btn primary" id="btnCustApply">Terapkan</button>
+          <button type="button" class="btn" id="btnCustSave">Unduh skenario (.json)</button>
+          <button type="button" class="btn" id="btnCustLoad">Impor skenario…</button>
+          <button type="button" class="btn" id="btnCustCode">Salin kode</button>
+          <button type="button" class="btn" id="btnCustPaste">Tempel kode…</button>
+          <input type="file" id="inCustFile" accept=".json,application/json" hidden>
+        </div>
+        <p class="muted small">Posisi y = sepanjang las (mm), kedalaman dari permukaan atas (mm), x = posisi melintang dari sumbu las (porositas/slag). Nilai dibatasi otomatis ke geometri las. Kode skenario bisa dibagikan ke siswa atau dipakai sebagai soal ujian (tab Ujian → Sumber soal).</p>
+        <p id="custMsg" class="small"></p>
+      </div>
       <label class="check"><input id="inShowDef" type="checkbox"> Tampilkan cacat &amp; exit point sebenarnya (mode guru)</label>
       <label class="check"><input id="inShowBeam" type="checkbox"> Tampilkan berkas &amp; sinar</label>
       <label class="check"><input id="inGrain" type="checkbox"> Noise butir material</label>
@@ -468,7 +507,7 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v0.9 · lintasan berkas 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v1.0 · lintasan berkas 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>
@@ -493,6 +532,7 @@
   <script src="src/main.js"></script>
   <script src="src/tutorial.js"></script>
   <script src="src/edu.js"></script>
+  <script src="src/editor.js"></script>
   <script src="src/i18n-lessons-en.js"></script>
   <script src="src/i18n.js"></script>
   <script>

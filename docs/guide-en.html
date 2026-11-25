@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weld UT Simulator Guide v1.0</title>
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<header>
+  <h1>Weld UT Simulator Guide <span>v1.0</span></h1>
+  <p class="sub">Educational Ultrasonic Testing (UT) simulator for weld inspection · ASME Sec. V Art. 4 reference · <a href="panduan.html">Versi Indonesia</a></p>
+</header>
+
+<h2>1. Getting started</h2>
+<ul>
+  <li><b>Opening</b>: open <code>index.html</code> in Chrome/Edge/Firefox, or the simulator’s GitHub Pages address. No installation or server is needed.</li>
+  <li><b>Offline</b>: after being opened once over http(s), the simulator is stored on the device and keeps working offline. On phones choose <i>Add to Home screen</i>.</li>
+  <li><b>Language</b>: the <b>EN/ID</b> button at the top right switches the whole interface, tutorials and reports.</li>
+  <li><b>Data</b>: reports, sessions and class summaries are stored only on the user’s device (files or browser storage).</li>
+</ul>
+
+<h2>2. Interface</h2>
+<table>
+  <tr><th>Area</th><th>Purpose</th></tr>
+  <tr><td>Activity</td><td>Free, Tutorial, Exam, Class summary.</td></tr>
+  <tr><td>Test piece</td><td>Weld (plate/pipe), IIW V1 block, V2 block, ASME basic calibration block, corroded plate, tubular joint.</td></tr>
+  <tr><td>Technique</td><td>Conventional UT, Phased Array (S-scan/E-scan, focusing), TOFD.</td></tr>
+  <tr><td>Scanning view</td><td>Cross-section with probe, −6 dB beam, gate and echo position per instrument. Drag the probe, or click and use the arrow keys (← → across, ↑ ↓ along the weld; Shift = 5 mm).</td></tr>
+  <tr><td>Top / 3D view</td><td>Probe position along the weld; for tubular joints a 3D view to choose the circumferential position φ.</td></tr>
+  <tr><td>A-scan &amp; readouts</td><td>Amplitude, %DAC or AWS rating, SP, depth, surface distance, position, leg, evaluation.</td></tr>
+</table>
+
+<h2>3. Inspection workflow</h2>
+<ol>
+  <li><b>Probe calibration</b> (the <i>New probe</i> button gives a probe with hidden errors): on the IIW V1/V2 block maximise the R100 echo (V2: R25/R50) → enter the X-value; adjust zero (and velocity) until the echoes are exactly at 100/200 mm; check the angle with the Ø50 hole (V1), Ø1.5 (70°–80°) or Ø5 (V2) → enter the measured angle.</li>
+  <li><b>DAC</b> on the ASME basic calibration block: maximise the ¼T, ½T, ¾T SDHs, then via leg 2; record each point without changing the gain. Press <i>Gain = reference</i>, then <i>Scanning gain (+6 dB)</i>. TCG is optional.</li>
+  <li><b>Scan the weld</b> from both sides and along its length. Set Gate A to enclose the echo.</li>
+  <li><b>Sizing</b>: length with 6 dB drop (peak at 80% → mark the ends at 40%), height with 6 dB drop or TOFD.</li>
+  <li><b>Evaluation</b>: choose ASME Sec. VIII Div. 1 App. 12 or AWS D1.1 (reference b from the Ø1.5 hole of the IIW block, face B), choose the indication interpretation.</li>
+  <li><b>Report</b>: <i>+ Add from current reading</i>, fill in <i>Report data</i> (project, procedure, instrument, couplant, …), then print/PDF or download .html.</li>
+</ol>
+
+<h2>4. Special test pieces</h2>
+<ul>
+  <li><b>Pipes</b>: girth welds (clock positions) or longitudinal/seam welds (circumferential section; maximum angle given by t/D). Use a <i>contoured wedge</i> and a curved calibration block for small diameters.</li>
+  <li><b>Austenitic steel</b>: high grain noise; compare shear and longitudinal waves, enable <i>Weld metal anisotropy</i> to see beam skewing.</li>
+  <li><b>Corroded plate</b>: single or dual (TR) 0° probe, C-scan thickness map, click the map to move the probe.</li>
+  <li><b>Tubular T/Y/K/X joints</b>: choose the circumferential position φ (heel 0°, toe 180°); the local section follows the dihedral angle Ψ; the info line shows the ideal probe angles; circumferential B-scan of the brace.</li>
+</ul>
+
+<h2>5. Tutorials (17 lessons)</h2>
+<p>1 A-scan basics · 2 IIW calibration · 3 DAC · 4 Sizing &amp; ASME evaluation · 5 V2 block · 6 TOFD · 7 Phased Array S-scan · 8 Pipes &amp; austenitic · 9 Transverse flaws (parallel scan) · 10 Straight beam &amp; lamination · 11 Scan plan &amp; coverage · 12 Corrosion &amp; dual probe · 13 PAUT focusing &amp; E-scan · 14 Pipe seam &amp; anisotropy · 15 AWS D1.1 · 16 Tubular: dihedral angle &amp; zones · 17 Tubular K &amp; X.</p>
+<p>Every step is checked automatically; the <i>Next</i> button becomes active once a step succeeds. Some steps are instrument-reading quizzes.</p>
+
+<h2>6. Exams &amp; class summary</h2>
+<ul>
+  <li><b>Levels</b>: Easy (DAC provided), Medium (build the DAC), Hard (probe calibration + DAC), Full practical (calibration, DAC and scanning gain graded at 30%).</li>
+  <li><b>Instructor settings</b>: exam test piece (plate, pipe girth, pipe seam, tubular), number of flaws, time limit (answers are submitted automatically when time runs out), task source (random from code or instructor scenario).</li>
+  <li><b>Exam package code</b> (<code>UTX1:…</code>): the instructor presses <i>Create exam package code</i> and shares it; students paste it and press <i>Use package</i>.</li>
+  <li><b>Grading</b>: detection 40, location 15, length 15, type 15, decision 15 per flaw; −10 per false call.</li>
+  <li><b>Class summary</b>: import student result files (.json) or reports (.html); scores are recalculated from the task code; statistics and CSV download.</li>
+</ul>
+
+<h2>7. Instructor tools</h2>
+<ul>
+  <li><b>Scenario editor</b>: on the <i>Flaws &amp; display</i> card choose <i>Instructor scenario (custom)</i>, define the flaws (type, side, y position, depth, x), press <i>Apply</i>. Save as a file or share with a <code>UTS1:…</code> code.</li>
+  <li><b>Exam from a scenario</b>: on the Exam tab choose <i>Task source: Instructor scenario</i>, then create an exam package code.</li>
+  <li><b>Teacher mode</b>: tick <i>Show flaws &amp; true exit point</i> (locked during exams).</li>
+</ul>
+
+<h2>8. Save &amp; open sessions</h2>
+<p><b>Save session</b> stores the settings, probe, calibration, DAC, sizing, report data and indication table in a <code>.json</code> file; <b>Open session</b> restores it. Not available while an exam is running.</p>
+
+<h2>9. Model &amp; limitations</h2>
+<ul>
+  <li>2D cross-section with ray paths (reflections at flat/curved surfaces), amplitude from the coherent sum of flaw surface points, Gaussian beam profile, attenuation, beam spreading, grain noise.</li>
+  <li>Amplitudes are qualitative and not validated against a specific instrument. Tubular joints use a local section (no 3D beam skew). The AWS D1.1 table is compiled for education; the tubular Class R/X criteria are not included.</li>
+  <li>The simulator <b>does not replace</b> practice with real equipment and specimens; its reports are not official inspection documents.</li>
+</ul>
+</body>
+</html>

@@ -20,7 +20,42 @@
    *   result: hasil UT.gradeExam (opsional)
    * }
    */
+  /** Sketsa lokasi indikasi (SVG): tampak atas las, sumbu mendatar = sepanjang las (atau φ untuk tubular). */
+  UT.reportSketchSVG = function (sk) {
+    if (!sk) return '';
+    const W = 680, H = 170, L = 40, R = 16, top = 22, mid = 88, sx = (W - L - R) / (sk.kind === 'tubular' ? 360 : sk.length);
+    const pos = (y) => L + (sk.kind === 'tubular' ? (y / sk.r) * (180 / Math.PI) : y) * sx;
+    const xs = 2.2; // px per mm melintang
+    const band = sk.half * xs;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="system-ui, sans-serif" font-size="10">`;
+    s += `<rect x="${L}" y="${mid - band}" width="${W - L - R}" height="${2 * band}" fill="#e7dcc6" stroke="#9c8357"/>`;
+    s += `<line x1="${L}" y1="${mid}" x2="${W - R}" y2="${mid}" stroke="#6b7785" stroke-dasharray="5 4"/>`;
+    const ticks = sk.kind === 'tubular' ? [0, 90, 180, 270, 360] : [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * sk.length));
+    ticks.forEach((t) => {
+      const x = sk.kind === 'tubular' ? L + t * sx : L + t * sx;
+      s += `<line x1="${x}" y1="${H - 30}" x2="${x}" y2="${H - 24}" stroke="#52606d"/><text x="${x}" y="${H - 12}" text-anchor="middle" fill="#52606d">${t}${sk.kind === 'tubular' ? '°' : ''}</text>`;
+    });
+    s += `<text x="${L}" y="${top - 8}" fill="#52606d">${sk.kind === 'tubular' ? 'posisi keliling φ (heel 0°, toe 180°)' : 'y sepanjang las (mm)'} · atas: sisi kiri / brace, bawah: sisi kanan / chord</text>`;
+    (sk.rows || []).forEach((r, i) => {
+      if (r.y1 == null && r.y2 == null) return;
+      const a = r.y1 != null ? r.y1 : r.y2, b = r.y2 != null ? r.y2 : r.y1;
+      const x1 = pos(Math.min(a, b)), x2 = Math.max(x1 + 3, pos(Math.max(a, b)));
+      const yc = mid + Math.max(-60, Math.min(60, (r.x || 0) * xs));
+      const col = r.verdict === 'tolak' ? '#d62828' : '#0077cc';
+      s += `<rect x="${x1}" y="${yc - 5}" width="${x2 - x1}" height="10" fill="${col}" fill-opacity="0.35" stroke="${col}"/>`;
+      s += `<text x="${(x1 + x2) / 2}" y="${yc - 8}" text-anchor="middle" fill="${col}" font-weight="bold">#${i + 1}</text>`;
+    });
+    return s + '</svg>';
+  };
+
   UT.buildReportHTML = function (d) {
+    const info = d.info || {};
+    const iv = (k) => esc(info[k] || '–');
+    const conclusion = d.indications.length
+      ? (d.indications.some((r) => r.verdict === 'tolak')
+        ? `DITOLAK – ${d.indications.filter((r) => r.verdict === 'tolak').length} indikasi tidak dapat diterima.`
+        : `DITERIMA – ${d.indications.length} indikasi tercatat, semuanya dapat diterima.`)
+      : 'DITERIMA – tidak ada indikasi yang perlu dilaporkan.';
     const rows = d.indications.map((r, i) => {
       const L = r.y1 != null && r.y2 != null ? Math.abs(r.y2 - r.y1) : null;
       return `<tr><td>${i + 1}</td><td>${f1(r.y1)}</td><td>${f1(r.y2)}</td><td>${f1(L)}</td><td>${f1(r.depth)}</td>`
@@ -71,21 +106,54 @@
 <p class="noprint"><button onclick="window.print()">Cetak / simpan PDF</button></p>
 <h1>Laporan Inspeksi Ultrasonik (UT) – Las</h1>
 <p class="meta">Simulator UT Las v${esc(UT.CONFIG.version)} · ${esc(d.mode)}${d.code ? ` · kode soal ${esc(d.code)}` : ''}${d.level ? ` · tingkat ${esc(d.level)}` : ''} · ${esc(d.date)}</p>
+<h2>1. Informasi umum</h2>
 <div class="grid">
+  <div><span>Proyek / klien</span>${iv('proyek')}</div>
+  <div><span>No. laporan</span>${iv('noLaporan')}</div>
+  <div><span>Lokasi pemeriksaan</span>${iv('lokasi')}</div>
+  <div><span>Tanggal</span>${esc(d.date)}</div>
   <div><span>Nama pemeriksa</span>${esc(d.student || '–')}</div>
-  <div><span>Acuan</span>ASME Sec. V Art. 4 / Sec. VIII Div. 1 App. 12</div>
-  <div><span>Benda uji</span>Pelat las bevel V, T = ${esc(d.specimen.T)} mm, ½ sudut bevel ${esc(d.specimen.bevel)}°</div>
+  <div><span>Level pemeriksa</span>${iv('level')}</div>
+</div>
+<h2>2. Benda uji</h2>
+<div class="grid">
+  <div><span>Identitas / no. sambungan</span>${iv('idBenda')}</div>
+  <div><span>Uraian</span>${esc(d.specimenDesc || '–')}</div>
   <div><span>Material</span>${esc(d.specimen.material)}</div>
+  <div><span>Tebal (T)</span>${esc(d.specimen.T)} mm</div>
+  <div><span>Kondisi permukaan</span>${iv('permukaan')}</div>
+  <div><span>Suhu permukaan</span>${info.suhu ? esc(info.suhu) + ' °C' : '–'}</div>
+</div>
+<h2>3. Prosedur &amp; acuan</h2>
+<div class="grid">
+  <div><span>No. prosedur</span>${iv('noProsedur')}</div>
+  <div><span>Acuan / kriteria</span>${esc(d.standard || 'ASME Sec. V Art. 4 / Sec. VIII Div. 1 App. 12')}</div>
+  <div><span>Teknik</span>${esc(d.technique || 'UT konvensional (pulse-echo)')}</div>
+</div>
+<h2>4. Peralatan</h2>
+<div class="grid">
+  <div><span>Flaw detector</span>${iv('alat')}</div>
+  <div><span>No. seri alat</span>${iv('noSeri')}</div>
   <div><span>Probe</span>${esc(d.probe.angle)}° nominal · ${esc(d.probe.freq)} MHz · kristal ${esc(d.probe.crystal)} mm</div>
+  <div><span>Couplant</span>${iv('couplant')}</div>
+</div>
+<h2>5. Kalibrasi</h2>
+<div class="grid">
   <div><span>Kalibrasi alat</span>X-value ${f1(d.cal.xValue)} mm · sudut ${f1(d.cal.angleUser)}° · zero ${Number(d.cal.zero).toFixed(2)} µs · v ${esc(d.cal.velocity)} m/s</div>
+  <div><span>Blok kalibrasi</span>IIW V1/V2 (probe), blok kalibrasi dasar ASME (DAC)</div>
   <div><span>Reference level</span>${d.dac && d.dac.refGain != null ? f1(d.dac.refGain) + ' dB' : '–'}</div>
   <div><span>Gain scanning</span>${d.dac && d.dac.scanGain != null ? f1(d.dac.scanGain) + ' dB' : '–'}</div>
+  ${d.awsB != null ? `<div><span>AWS reference level b</span>${f1(d.awsB)} dB</div>` : ''}
 </div>
 <h2>Titik DAC (blok kalibrasi dasar ASME)</h2>
 <table><thead><tr><th>#</th><th>SP (mm)</th><th>Amplitudo pada reference level</th></tr></thead><tbody>${dacRows}</tbody></table>
-<h2>Indikasi</h2>
+<h2>6. Indikasi</h2>
 <table><thead><tr><th>#</th><th>y awal (mm)</th><th>y akhir (mm)</th><th>Panjang (mm)</th><th>Kedalaman (mm)</th>
 <th>Posisi thd sumbu las (mm)</th><th>%DAC</th><th>Interpretasi</th><th>Keputusan</th><th>Catatan</th></tr></thead><tbody>${rows}</tbody></table>
+<h2>7. Sketsa lokasi indikasi</h2>
+${UT.reportSketchSVG(d.sketch)}
+<h2>8. Kesimpulan</h2>
+<p><b>${esc(conclusion)}</b></p>
 ${result}
 <div class="sign"><div>Pemeriksa</div><div>Penilai / instruktur</div></div>
 <p class="note">Dibuat dengan simulator edukasi. Model fisika disederhanakan; laporan ini bukan dokumen inspeksi resmi.</p>
