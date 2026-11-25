@@ -853,5 +853,35 @@ test('laporan: memuat data laporan, sketsa lokasi, dan kesimpulan', () => {
   ['P-1', 'UT-9', '<svg', 'DITOLAK'].forEach((k) => assert.ok(html.includes(k), k));
 });
 
+// ---- v1.1: AWS D1.1:2025
+test('AWS Tabel 8.3 (siklik): batas kelas sesuai tabel, scanning level menurut SP', () => {
+  const cls = (d, t, ang) => UT.evaluateAWS({ a: 50 + d, b: 50, sp: 20, t, angle: ang, length: 10, depth: t / 2, cyclic: true }).cls;
+  assert.deepStrictEqual([10, 11, 12, 13].map((d) => cls(d, 16, 70)), ['A', 'B', 'C', 'D']);
+  assert.deepStrictEqual([8, 9, 10, 11].map((d) => cls(d, 25, 70)), ['A', 'B', 'C', 'D']);
+  assert.deepStrictEqual([4, 6, 8, 9].map((d) => cls(d, 50, 70)), ['A', 'B', 'C', 'D']);
+  assert.deepStrictEqual([9, 11, 13, 14].map((d) => cls(d, 50, 45)), ['A', 'B', 'C', 'D']);
+  assert.deepStrictEqual([-2, 0, 2, 3].map((d) => cls(d, 150, 70)), ['A', 'B', 'C', 'D']);
+  assert.deepStrictEqual([60, 100, 200, 300].map(UT.awsScanLevel), [20, 25, 35, 45]);
+  const b = UT.evaluateAWS({ a: 61, b: 50, sp: 20, t: 16, angle: 70, length: 25, depth: 8, cyclic: true });
+  assert.strictEqual(b.verdict, 'tolak', 'kelas B > 20 mm ditolak');
+});
+test('AWS Annex N: level 1/2/3 untuk beban statis dan siklik', () => {
+  assert.strictEqual(UT.evaluateAWSN({ pctDAC: 45, length: 100, t: 20 }).verdict, 'abaikan');
+  assert.strictEqual(UT.evaluateAWSN({ pctDAC: 200, length: 5, t: 20 }).verdict, 'tolak', '> 5 dB di atas SSL');
+  assert.strictEqual(UT.evaluateAWSN({ pctDAC: 150, length: 18, t: 20 }).verdict, 'terima', 'statis ≤ 20 mm');
+  assert.strictEqual(UT.evaluateAWSN({ pctDAC: 150, length: 18, t: 20, cyclic: true }).verdict, 'tolak', 'siklik > 12 mm');
+  assert.strictEqual(UT.evaluateAWSN({ pctDAC: 80, length: 40, t: 20, depth: 10, cyclic: true }).verdict, 'terima', 'siklik tengah ≤ 50');
+  assert.strictEqual(UT.evaluateAWSN({ pctDAC: 80, length: 40, t: 20, depth: 2, cyclic: true }).verdict, 'tolak', 'siklik atas ≤ 20');
+});
+test('AWS tubular Class R: batas Gambar 10.23 menurut tebal las', () => {
+  const a = UT.classRLimits(10), b = UT.classRLimits(38), c = UT.classRLimits(60, 300);
+  assert.deepStrictEqual([a.indivSSL, a.indivMinor, a.accumSSL, a.evalLen], [6, 20, 12, 75]);
+  assert.deepStrictEqual([b.indivSSL, b.indivMinor], [20, 50]);
+  assert.deepStrictEqual([c.accumSSL, c.accumAll, c.evalLen], [50, 100, 150]);
+  assert.strictEqual(UT.evaluateClassR({ pctDAC: 150, length: 8, t: 10 }).verdict, 'tolak');
+  assert.strictEqual(UT.evaluateClassR({ pctDAC: 80, length: 15, t: 10 }).verdict, 'terima');
+  assert.strictEqual(UT.evaluateClassR({ pctDAC: 40, length: 99, t: 10 }).verdict, 'abaikan');
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);

@@ -94,7 +94,10 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [x] Simpan & buka sesi
 - [x] Panduan pengguna ID/EN (HTML + PDF), aksesibilitas, performa HP lama
 
-## v1.1 (menunggu masukan)
-- [ ] Kriteria standar dari dokumen resmi: cek ulang tabel AWS D1.1 non-tubular, tubular Class R/X, opsi ISO 11666/5817
+## v1.1 – Kriteria AWS D1.1:2025 ✅
+- [x] Tabel 8.3 (siklik) + scanning level, Annex N Tabel N.1, tubular Class R (Gambar 10.23)
+
+## v1.2 (menunggu masukan)
+- [ ] Tabel 8.2 (statis) dari dokumen; tubular Class X (Gambar 10.24); definisi SSL 10.29.6; opsi ISO 11666/5817
 - [ ] Validasi amplitudo terhadap data alat nyata dan review praktisi NDT Level II/III
 - [ ] Tag rilis v1.0 & GitHub Pages

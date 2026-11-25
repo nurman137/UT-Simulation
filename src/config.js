@@ -7,7 +7,7 @@
   const UT = (g.UT = g.UT || {});
 
   UT.CONFIG = {
-    version: '1.0.0',
+    version: '1.1.0',
 
     // Material aktif (objek ini diperbarui oleh UT.setMaterial; referensinya tetap sama)
     material: {},

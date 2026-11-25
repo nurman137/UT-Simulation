@@ -76,6 +76,8 @@
   const isE = () => isTech('paut') && S.pautMode === 'E';
   const isKor = () => !!spec && spec.type === 'korosi';
   const isTub = () => !!spec && spec.type === 'tubular';
+  /** Acuan AWS berbasis rating d = a − b − c (perlu reference level b). */
+  const isRatingCode = () => S.code === 'aws' || S.code === 'aws-cyc';
   // Penampang lokal sambungan tubular per posisi φ (disimpan agar B-scan keliling cepat)
   const tubCache = new Map();
   let tubCacheVer = -1;
@@ -505,6 +507,15 @@
       renderDac();
     });
     $('inCode').addEventListener('change', (e) => { S.code = e.target.value; renderDac(); lastRo = ''; });
+    // Scanning level AWS (Tabel 8.3): gain = b + level menurut SP di ujung gate
+    $('btnAwsScan').addEventListener('click', () => {
+      if (S.awsB == null) { dacMsg = 'Rekam reference level b dulu.'; renderDac(); return; }
+      const lv = UT.awsScanLevel(S.gateStart + S.gateWidth);
+      if (lv == null) return;
+      setGain(S.awsB + lv);
+      dacMsg = `Gain scanning = b + ${lv} dB (SP sampai ${(S.gateStart + S.gateWidth).toFixed(0)} mm).`;
+      renderDac();
+    });
     $('btnDacUndo').addEventListener('click', () => {
       dac.points.pop();
       dacMsg = '';
@@ -866,7 +877,7 @@
       ol.appendChild(li);
     });
     $('btnGainRef').disabled = $('btnGainScan').disabled = !dac.points.length;
-    $('awsRef').hidden = S.code !== 'aws';
+    $('awsRef').hidden = !isRatingCode();
     $('inCode').value = S.code;
     $('awsBOut').textContent = S.awsB == null ? '– (belum direkam)' : `${S.awsB.toFixed(1)} dB`;
     $('dacMsg').hidden = !dacMsg;
@@ -1566,16 +1577,16 @@
     // AWS D1.1: rating indikasi d = a − b − c
     let aws = null;
     lastAws = null;
-    if (S.code === 'aws' && peak.triggered && (isWeld() || isTub()) && userAngle() !== 0) {
+    if (isRatingCode() && peak.triggered && (isWeld() || isTub()) && userAngle() !== 0) {
       const l = locateNow(peak.sp, uIdx);
       const L = sizing.y1 != null && sizing.y2 != null ? Math.abs(sizing.y2 - sizing.y1) : null;
       const a = UT.awsGainAtRef(S.gain, Math.max(0.5, Math.min(peak.amp, 100)));
-      aws = UT.evaluateAWS({ a, b: S.awsB, sp: peak.sp, t: spec.T, angle: S.angleUser, length: L, depth: l.depth });
+      aws = UT.evaluateAWS({ a, b: S.awsB, sp: peak.sp, t: spec.T, angle: S.angleUser, length: L, depth: l.depth, cyclic: S.code === 'aws-cyc' });
       lastAws = aws;
       if (aws.d != null && S.awsB != null) ro.dac = `d ${aws.d >= 0 ? '+' : ''}${aws.d} dB${aws.cls ? ` · kelas ${aws.cls}` : ''}`;
       else ro.dac = 'b belum direkam';
     }
-    $('roDacL').textContent = S.code === 'aws' && isWeld() ? 'Rating AWS (d)' : 'Terhadap DAC';
+    $('roDacL').textContent = isRatingCode() && (isWeld() || isTub()) ? 'Rating AWS (d)' : 'Terhadap DAC';
     ro.p = isPar() ? `x ${S.probeY >= 0 ? '+' : '−'}${Math.abs(S.probeY).toFixed(1)} mm · y ${S.probeX.toFixed(1)}`
       : isTub() ? `φ ${tubPhi().toFixed(0)}° · ${tubLocal().sec.zone} · Ψ ${tubLocal().sec.psi.toFixed(0)}°`
       : isWeld() ? `${S.probeY.toFixed(1)} mm${spec.isPipe ? ` (${clock(S.probeY)})` : ''}` : `${uIdx.toFixed(1)} mm`;
@@ -1584,7 +1595,11 @@
     let ev = null;
     if ((isWeld() || isTub()) && peak.triggered && userAngle() !== 0) {
       const L = sizing.y1 != null && sizing.y2 != null ? Math.abs(sizing.y2 - sizing.y1) : null;
-      ev = aws || UT.evaluateASME({ pctDAC: pct, dacExists: dac.points.length > 0, type: S.indType, length: L, t: spec.T });
+      const dl = locateNow(peak.sp, uIdx).depth;
+      ev = aws
+        || (S.code === 'awsN-s' || S.code === 'awsN-c' ? UT.evaluateAWSN({ pctDAC: pct, length: L, depth: dl, t: spec.T, cyclic: S.code === 'awsN-c' }) : null)
+        || (S.code === 'awsR' ? UT.evaluateClassR({ pctDAC: pct, length: L, type: S.indType, t: spec.T, D: spec.OD || (spec.J ? 2 * spec.J.r : null) }) : null)
+        || UT.evaluateASME({ pctDAC: pct, dacExists: dac.points.length > 0, type: S.indType, length: L, t: spec.T });
     }
     if (isTub()) {
       const ph = tubPhi();
@@ -1608,7 +1623,7 @@
     if (ev) {
       const label = { abaikan: 'Abaikan', terima: 'Dapat diterima', tolak: 'Ditolak', ukur: 'Perlu sizing', nodac: 'Tidak dapat dievaluasi' }[ev.verdict];
       box.className = `evalbox v-${ev.verdict}`;
-      box.innerHTML = `<b>Evaluasi ${aws ? 'AWS D1.1' : 'ASME'}: ${label}</b> <span>${ev.text}</span>`;
+      box.innerHTML = `<b>Evaluasi ${UT.codeLabel(S.code)}: ${label}</b> <span>${ev.text}</span>`;
     }
   }
 

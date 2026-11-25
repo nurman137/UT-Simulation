@@ -2,7 +2,7 @@
  * Service worker: simpan semua berkas aplikasi agar simulator bisa dipakai tanpa internet.
  * Ganti CACHE setiap rilis supaya versi lama dibersihkan.
  */
-const CACHE = 'ut-sim-v1.0.0';
+const CACHE = 'ut-sim-v1.1.0';
 const FILES = [
   './',
   './index.html',

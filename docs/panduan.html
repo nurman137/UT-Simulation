@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panduan Simulator UT Las v1.0</title>
+<title>Panduan Simulator UT Las v1.1</title>
 <link rel="stylesheet" href="guide.css">
 </head>
 <body>
 <header>
-  <h1>Panduan Simulator UT Las <span>v1.0</span></h1>
+  <h1>Panduan Simulator UT Las <span>v1.1</span></h1>
   <p class="sub">Simulator edukasi Ultrasonic Testing (UT) untuk inspeksi las · acuan ASME Sec. V Art. 4 · <a href="guide-en.html">English version</a></p>
 </header>
 
@@ -37,7 +37,7 @@
   <li><b>DAC</b> di blok kalibrasi dasar ASME: maksimalkan SDH ¼T, ½T, ¾T, lalu lewat leg 2; rekam tiap titik tanpa mengubah gain. Tekan <i>Gain = reference</i>, lalu <i>Gain scanning (+6 dB)</i>. TCG opsional.</li>
   <li><b>Scan las</b> dari kedua sisi dan sepanjang las. Atur Gate A agar melingkupi echo.</li>
   <li><b>Sizing</b>: panjang dengan 6 dB drop (puncak 80% → tandai ujung saat 40%), tinggi dengan 6 dB drop atau TOFD.</li>
-  <li><b>Evaluasi</b>: pilih acuan ASME Sec. VIII Div. 1 App. 12 atau AWS D1.1 (reference b dari lubang Ø1,5 blok IIW sisi B), pilih interpretasi indikasi.</li>
+  <li><b>Evaluasi</b>: pilih acuan ASME Sec. VIII Div. 1 App. 12, AWS D1.1 Tabel 8.2/8.3 (rating d; reference b dari lubang Ø1,5 blok IIW sisi B, tombol <i>Gain scanning AWS</i> memakai scanning level menurut SP), AWS D1.1 Annex N (SSL/DRL), atau tubular Class R; pilih interpretasi indikasi.</li>
   <li><b>Laporan</b>: <i>+ Tambah dari pembacaan saat ini</i>, lengkapi <i>Data laporan</i> (proyek, prosedur, alat, couplant, …), lalu cetak/PDF atau unduh .html.</li>
 </ol>
 
@@ -75,7 +75,7 @@
 <h2>9. Model &amp; batasan</h2>
 <ul>
   <li>Penampang 2D dengan lintasan sinar (pantulan di permukaan datar/lengkung), amplitudo dari penjumlahan koheren titik-titik permukaan cacat, profil berkas Gaussian, atenuasi, penyebaran berkas, noise butir.</li>
-  <li>Amplitudo bersifat kualitatif dan belum divalidasi terhadap alat tertentu. Tubular memakai penampang lokal (tanpa skew berkas 3D). Tabel AWS D1.1 disusun untuk edukasi; kriteria tubular Class R/X belum dimasukkan.</li>
+  <li>Amplitudo bersifat kualitatif dan belum divalidasi terhadap alat tertentu. Tubular memakai penampang lokal (tanpa skew berkas 3D). AWS D1.1: Tabel 8.3, Annex N, dan Class R mengikuti edisi 2025; Tabel 8.2 belum diverifikasi; SSL disimulasikan = DAC 100%; Class X belum dimasukkan.</li>
   <li>Simulator <b>tidak menggantikan</b> latihan dengan alat dan spesimen nyata; laporan yang dihasilkan bukan dokumen inspeksi resmi.</li>
 </ul>
 </body>

@@ -16,10 +16,19 @@ berkas (`file://`) aplikasi juga jalan, tetapi tanpa fitur pasang/offline otomat
 
 ## Panduan pengguna
 
-- Bahasa Indonesia: [docs/panduan.html](docs/panduan.html) · [PDF](docs/Panduan-Simulator-UT-Las-v1.0.pdf)
-- English: [docs/guide-en.html](docs/guide-en.html) · [PDF](docs/Weld-UT-Simulator-Guide-v1.0.pdf)
+- Bahasa Indonesia: [docs/panduan.html](docs/panduan.html) · [PDF](docs/Panduan-Simulator-UT-Las.pdf)
+- English: [docs/guide-en.html](docs/guide-en.html) · [PDF](docs/Weld-UT-Simulator-Guide.pdf)
 
 ## Fitur
+
+### v1.1 – Kriteria AWS D1.1:2025
+- **Tabel 8.3** (nontubular, beban siklik, tarik): rating d = a − b − c, kelas A–D untuk tebal 8–200 mm dan probe
+  70/60/45°, batas panjang kelas B/C (20/50 mm), **scanning level** menurut sound path (tombol *Gain scanning AWS*).
+- **Annex N, Tabel N.1** (statis & siklik): SSL/DRL; level 1 (> 5 dB di atas SSL ditolak), level 2, level 3 diabaikan.
+- **Tubular Class R** (10.26.1.1, Gambar 10.23): DRL = SSL − 6 dB; batas panjang reflektor individual dan akumulasi
+  menurut tebal las (dibaca dari grafik); reflektor bulat terpisah s.d. SSL diterima.
+- Pilihan acuan di kartu Sizing & evaluasi; laporan mencantumkan acuan yang dipakai.
+- Belum: verifikasi Tabel 8.2 (statis), Class X (Gambar 10.24), definisi SSL 10.29.6 (simulator memakai DAC 100%).
 
 ### v1.0 – Alat instruktur, laporan standar, sesi, rilis
 - **Ujian di berbagai benda uji**: pelat, pipa girth, pipa memanjang (seam), sambungan tubular T/Y/K/X; jumlah cacat,

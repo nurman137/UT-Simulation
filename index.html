@@ -15,7 +15,7 @@
   <header class="topbar">
     <div class="brand">
       <h1 class="brandname">Simulator UT Las</h1>
-      <span class="ver">v1.0 · acuan ASME Sec. V Art. 4</span>
+      <span class="ver">v1.1 · acuan ASME Sec. V Art. 4</span>
     </div>
     <span class="btnrow topbtns">
       <button id="btnHelp" class="btn" type="button" aria-expanded="false" aria-controls="help">Cara pakai</button>
@@ -48,8 +48,8 @@
           <li>Penampang 2D: lintasan sinar dengan pantulan di permukaan datar atau lengkung; amplitudo dari penjumlahan koheren titik-titik permukaan cacat (Huygens/Kirchhoff), profil berkas Gaussian, atenuasi, dan penyebaran berkas.</li>
           <li>Anisotropi las austenitik dimodelkan sederhana (arah energi berbelok mengikuti orientasi butir kolumnar). Fokus Phased Array hanya di bidang aktif; delay law dihitung untuk kontak langsung tanpa wedge.</li>
           <li>Tidak dimodelkan: konversi mode penuh, pemisahan berkas (beam splitting) di las austenitik, kekasaran permukaan korosi selain kemiringan.</li>
-          <li>Tabel kelas AWS D1.1 disusun untuk edukasi; cocokkan dengan edisi standar yang berlaku sebelum dipakai.</li>
-          <li>Sambungan tubular: geometri 3D dan sudut dihedral lokal Ψ dihitung tepat, tetapi simulasi UT memakai penampang lokal 2D (chord dianggap lurus secara lokal, tanpa skew berkas 3D). Evaluasi memakai %DAC (ASME) atau rating AWS; kriteria tubular Class R/X belum dimasukkan.</li>
+          <li>AWS D1.1: Tabel 8.3 (siklik), Annex N (SSL/DRL), dan tubular Class R (Gambar 10.23, batas dibaca dari grafik) mengikuti edisi 2025; Tabel 8.2 (statis) belum diverifikasi. SSL disimulasikan = kurva DAC 100% (definisi 10.29.6 belum dimasukkan); Class X belum dimasukkan.</li>
+          <li>Sambungan tubular: geometri 3D dan sudut dihedral lokal Ψ dihitung tepat, tetapi simulasi UT memakai penampang lokal 2D (chord dianggap lurus secara lokal, tanpa skew berkas 3D). Evaluasi memakai %DAC (ASME), rating AWS, atau AWS Class R; Class X belum dimasukkan.</li>
           <li>Nilai amplitudo bersifat kualitatif (proporsi antar-reflektor dibuat realistis, belum divalidasi terhadap alat tertentu). Faktor material dan rugi kopling permukaan lengkung juga kualitatif.</li>
           <li>Dimensi blok V1/V2 diturunkan dari skala sudut pada blok fisik; blok kalibrasi ASME disederhanakan (tebal blok = tebal las).</li>
           <li>Simulator ini <b>tidak menggantikan</b> latihan dengan alat dan spesimen nyata, dan laporan yang dihasilkan bukan dokumen inspeksi resmi.</li>
@@ -59,7 +59,7 @@
   </section>
 
   <section id="help" class="help" hidden aria-label="Cara pakai">
-    <p class="small guidelinks"><b>Panduan lengkap:</b> <a href="docs/panduan.html" target="_blank" rel="noopener">Panduan (HTML)</a> · <a href="docs/Panduan-Simulator-UT-Las-v1.0.pdf" target="_blank" rel="noopener">PDF</a> · <a href="docs/guide-en.html" target="_blank" rel="noopener">English guide</a> · <a href="docs/Weld-UT-Simulator-Guide-v1.0.pdf" target="_blank" rel="noopener">PDF (EN)</a></p>
+    <p class="small guidelinks"><b>Panduan lengkap:</b> <a href="docs/panduan.html" target="_blank" rel="noopener">Panduan (HTML)</a> · <a href="docs/Panduan-Simulator-UT-Las.pdf" target="_blank" rel="noopener">PDF</a> · <a href="docs/guide-en.html" target="_blank" rel="noopener">English guide</a> · <a href="docs/Weld-UT-Simulator-Guide.pdf" target="_blank" rel="noopener">PDF (EN)</a></p>
     <div class="help-cols">
       <div>
         <h3>Dasar</h3>
@@ -347,7 +347,8 @@
       <div id="awsRef" class="awsref" hidden>
         <b class="small">AWS D1.1 – reference level b</b>
         <p class="muted small">Di <b>Blok IIW V1 sisi B</b>, maksimalkan echo lubang Ø1,5 mm, pastikan di dalam Gate A, lalu rekam. b = gain yang membuat echo itu tepat di garis referensi 50% FSH.</p>
-        <div class="btnrow"><button type="button" id="btnAwsB" class="btn">Rekam b (puncak gate)</button></div>
+        <div class="btnrow"><button type="button" id="btnAwsB" class="btn">Rekam b (puncak gate)</button>
+          <button type="button" id="btnAwsScan" class="btn">Gain scanning AWS</button></div>
         <p class="small">b = <b id="awsBOut">–</b></p>
       </div>
       <ol id="dacList" class="daclist small"></ol>
@@ -380,7 +381,11 @@
           <label>Acuan evaluasi
             <select id="inCode">
               <option value="asme">ASME Sec. VIII Div. 1 App. 12</option>
-              <option value="aws">AWS D1.1 (struktur, beban statis)</option>
+              <option value="aws">AWS D1.1 Tabel 8.2 – statis (rating d)</option>
+              <option value="aws-cyc">AWS D1.1 Tabel 8.3 – siklik, tarik (rating d)</option>
+              <option value="awsN-s">AWS D1.1 Annex N – statis (SSL/DRL)</option>
+              <option value="awsN-c">AWS D1.1 Annex N – siklik (SSL/DRL)</option>
+              <option value="awsR">AWS D1.1 tubular Class R (Gambar 10.23)</option>
             </select>
           </label>
           <label>Interpretasi indikasi
@@ -507,7 +512,7 @@
     </fieldset>
   </section>
 
-  <footer class="foot muted small">Simulator UT Las v1.0 · lintasan berkas 2D + model amplitudo semi-analitik</footer>
+  <footer class="foot muted small">Simulator UT Las v1.1 · lintasan berkas 2D + model amplitudo semi-analitik</footer>
 
   <script src="src/config.js"></script>
   <script src="src/geometry.js"></script>

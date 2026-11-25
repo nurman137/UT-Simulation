@@ -490,9 +490,9 @@
     return {
       info: Object.assign({}, S.reportInfo || {}),
       specimenDesc: specimenDesc(),
-      standard: S.code === 'aws' ? 'AWS D1.1 (struktur, beban statis)' : 'ASME Sec. V Art. 4 / Sec. VIII Div. 1 App. 12',
+      standard: UT.codeFull(S.code),
       technique: S.technique === 'paut' ? 'Phased Array' : S.technique === 'tofd' ? 'TOFD' : 'UT konvensional (pulse-echo)',
-      awsB: S.code === 'aws' ? S.awsB : null,
+      awsB: S.code === 'aws' || S.code === 'aws-cyc' ? S.awsB : null,
       sketch: { kind: tub ? 'tubular' : 'linear', length: sp.yLen || UT.CONFIG.weldLength, r: tub ? sp.J.r : null,
         half: tub ? 20 : sp.weld ? sp.weld.capHalf : 10, rows: rows.slice() },
       student: $('inStudent').value.trim(),

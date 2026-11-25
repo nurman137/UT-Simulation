@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Weld UT Simulator Guide v1.0</title>
+<title>Weld UT Simulator Guide v1.1</title>
 <link rel="stylesheet" href="guide.css">
 </head>
 <body>
 <header>
-  <h1>Weld UT Simulator Guide <span>v1.0</span></h1>
+  <h1>Weld UT Simulator Guide <span>v1.1</span></h1>
   <p class="sub">Educational Ultrasonic Testing (UT) simulator for weld inspection · ASME Sec. V Art. 4 reference · <a href="panduan.html">Versi Indonesia</a></p>
 </header>
 
@@ -37,7 +37,7 @@
   <li><b>DAC</b> on the ASME basic calibration block: maximise the ¼T, ½T, ¾T SDHs, then via leg 2; record each point without changing the gain. Press <i>Gain = reference</i>, then <i>Scanning gain (+6 dB)</i>. TCG is optional.</li>
   <li><b>Scan the weld</b> from both sides and along its length. Set Gate A to enclose the echo.</li>
   <li><b>Sizing</b>: length with 6 dB drop (peak at 80% → mark the ends at 40%), height with 6 dB drop or TOFD.</li>
-  <li><b>Evaluation</b>: choose ASME Sec. VIII Div. 1 App. 12 or AWS D1.1 (reference b from the Ø1.5 hole of the IIW block, face B), choose the indication interpretation.</li>
+  <li><b>Evaluation</b>: choose ASME Sec. VIII Div. 1 App. 12, AWS D1.1 Table 8.2/8.3 (rating d; reference b from the Ø1.5 hole of the IIW block, face B; the <i>AWS scanning gain</i> button applies the scanning level by sound path), AWS D1.1 Annex N (SSL/DRL), or tubular Class R; choose the indication interpretation.</li>
   <li><b>Report</b>: <i>+ Add from current reading</i>, fill in <i>Report data</i> (project, procedure, instrument, couplant, …), then print/PDF or download .html.</li>
 </ol>
 
@@ -75,7 +75,7 @@
 <h2>9. Model &amp; limitations</h2>
 <ul>
   <li>2D cross-section with ray paths (reflections at flat/curved surfaces), amplitude from the coherent sum of flaw surface points, Gaussian beam profile, attenuation, beam spreading, grain noise.</li>
-  <li>Amplitudes are qualitative and not validated against a specific instrument. Tubular joints use a local section (no 3D beam skew). The AWS D1.1 table is compiled for education; the tubular Class R/X criteria are not included.</li>
+  <li>Amplitudes are qualitative and not validated against a specific instrument. Tubular joints use a local section (no 3D beam skew). AWS D1.1: Table 8.3, Annex N and Class R follow the 2025 edition; Table 8.2 is not yet verified; SSL is simulated as the 100% DAC; Class X is not included.</li>
   <li>The simulator <b>does not replace</b> practice with real equipment and specimens; its reports are not official inspection documents.</li>
 </ul>
 </body>
