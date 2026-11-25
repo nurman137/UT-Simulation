@@ -184,14 +184,15 @@
     const tau = 0.6 * d.lambda, invTau2 = 1 / (tau * tau), win = 3 * tau;
     const re = new Float32Array(n);
     const dsp = (spEnd - spStart) / (n - 1);
+    const PT = UT.pulseTable(win, dsp, invTau2, kw), PK = PT.K, PM = PT.m, PI = PT.inv;
     function add(r, a) {
       if (r + win < spStart || r - win > spEnd) return;
       let j0 = Math.ceil((r - win - spStart) / dsp), j1 = Math.floor((r + win - spStart) / dsp);
       if (j0 < 0) j0 = 0;
       if (j1 > n - 1) j1 = n - 1;
       for (let j = j0; j <= j1; j++) {
-        const u = spStart + j * dsp - r;
-        re[j] += a * Math.exp(-u * u * invTau2) * Math.cos(kw * u);
+        const k = Math.round((spStart + j * dsp - r) * PI) + PM;
+        if (k >= 0 && k < PK.length) re[j] += a * PK[k];
       }
     }
     // Segmen lintasan + panjang kumulatif di dalam logam las

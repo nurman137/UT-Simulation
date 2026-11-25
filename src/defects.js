@@ -457,7 +457,73 @@
       desc: 'Cacat acak sepanjang las. Jenis, posisi, dan ukurannya ditentukan oleh kode soal sehingga bisa diulang atau dibagikan.',
       build: (w, opt) => UT.randomDefects(w, (opt && opt.seed) || 1, (opt && opt.count) || 2, opt && opt.yLen, (opt && opt.gen) || 2),
     },
+    {
+      id: 'kustom',
+      name: 'Skenario instruktur (kustom)',
+      desc: 'Cacat disusun sendiri di editor skenario: jenis, sisi, posisi sepanjang las, dan kedalaman. Skenario bisa diunduh, dibagikan lewat kode, dan dipakai sebagai soal ujian.',
+      build: (w, opt) => merge(((opt && opt.custom) || []).map((d) => UT.customPart(w, d)).filter(Boolean), w.T),
+    },
   ];
+
+  // ------------------------------------------------------------------ skenario instruktur (kustom)
+  UT.CUSTOM_TYPES = [
+    { id: 'lof', name: 'Lack of fusion (dinding bevel)', side: true, z: true },
+    { id: 'ip', name: 'Incomplete penetration (akar)', side: false, z: false },
+    { id: 'porositas', name: 'Porositas (kluster)', side: false, z: true, x: true, point: true },
+    { id: 'slag', name: 'Slag inclusion', side: false, z: true, x: true },
+    { id: 'crack', name: 'Retak memanjang (tengah las)', side: false, z: true },
+    { id: 'root-crack', name: 'Retak akar', side: false, z: false },
+    { id: 'transverse', name: 'Retak melintang', side: false, z: true, point: true },
+    { id: 'undercut', name: 'Undercut (kaki las)', side: true, z: false },
+    { id: 'toe', name: 'Retak kaki las', side: true, z: false },
+  ];
+  const num = (v, d) => (isFinite(+v) ? +v : d);
+
+  /** Bersihkan definisi skenario kustom (tipe dikenal, angka wajar, maks. 8 cacat). */
+  UT.cleanCustom = function (defs) {
+    return (Array.isArray(defs) ? defs : []).slice(0, 8)
+      .filter((d) => d && UT.CUSTOM_TYPES.some((t) => t.id === d.type))
+      .map((d) => {
+        const y1 = Math.max(0, num(d.y1, 100)), y2 = Math.max(y1 + 1, num(d.y2, y1 + 20));
+        const z1 = Math.max(0, num(d.z1, 5)), z2 = Math.max(z1 + 0.5, num(d.z2, z1 + 4));
+        return { type: d.type, side: d.side === 'kanan' ? 'kanan' : 'kiri', y1, y2, z1, z2, x: num(d.x, 0) };
+      });
+  };
+
+  /** Bagian cacat dari satu definisi kustom (dibatasi ke geometri las). */
+  UT.customPart = function (w, d) {
+    const T = w.T, side = d.side === 'kanan' ? 1 : -1;
+    const clampZ = (z, lo, hi) => Math.max(lo, Math.min(hi, z));
+    const z1 = clampZ(Math.min(d.z1, d.z2), 0.3, T - 0.8), z2 = clampZ(Math.max(d.z1, d.z2), z1 + 0.5, T - 0.3);
+    const y1 = d.y1, y2 = d.y2, yc = (y1 + y2) / 2;
+    const xIn = (z) => { const lim = Math.max(0, UT.fusionX(w, z, 1) - 2); return Math.max(-lim, Math.min(lim, d.x || 0)); };
+    switch (d.type) {
+      case 'lof': return D.lof(w, side, z1, Math.min(z2, T - w.rf - 0.3), y1, y2);
+      case 'ip': return D.ip(w, y1, y2);
+      case 'porositas': return D.porositas(w, xIn((z1 + z2) / 2), (z1 + z2) / 2, Math.min(1, T / 20), yc);
+      case 'slag': return D.slag(w, xIn((z1 + z2) / 2), (z1 + z2) / 2, y1, y2);
+      case 'crack': return D.crack(w, z1, Math.min(z2, T - w.rf - 0.5), y1, y2, 0);
+      case 'root-crack': return D.rootCrack(w, Math.min(4, T * 0.25), y1, y2, 0.3);
+      case 'transverse': return D.transverse(w, yc, z1, z2, Math.max(2, UT.fusionX(w, (z1 + z2) / 2, 1) * 0.8));
+      case 'undercut': return D.undercut(w, side, y1, y2, 0.8);
+      case 'toe': return D.toeCrack(w, side, y1, y2, Math.min(4, T * 0.25));
+      default: return null;
+    }
+  };
+
+  /** Kode bagikan skenario (UTS1:…base64 JSON). */
+  UT.customToCode = function (defs) {
+    const json = JSON.stringify(UT.cleanCustom(defs).map((d) => [d.type, d.side === 'kanan' ? 1 : 0, +d.y1.toFixed(1), +d.y2.toFixed(1), +d.z1.toFixed(1), +d.z2.toFixed(1), +d.x.toFixed(1)]));
+    const b64 = typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, 'utf8').toString('base64');
+    return 'UTS1:' + b64;
+  };
+  UT.customFromCode = function (code) {
+    const m = String(code || '').trim().match(/^UTS1:([A-Za-z0-9+/=]+)$/);
+    if (!m) throw new Error('kode skenario tidak dikenali');
+    const json = typeof atob === 'function' ? decodeURIComponent(escape(atob(m[1]))) : Buffer.from(m[1], 'base64').toString('utf8');
+    const arr = JSON.parse(json);
+    return UT.cleanCustom(arr.map((a) => ({ type: a[0], side: a[1] ? 'kanan' : 'kiri', y1: a[2], y2: a[3], z1: a[4], z2: a[5], x: a[6] })));
+  };
 
   UT.findScenario = function (id) {
     return UT.SCENARIOS.find((s) => s.id === id) || UT.SCENARIOS[0];

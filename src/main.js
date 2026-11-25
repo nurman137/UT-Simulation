@@ -806,6 +806,8 @@
     $('inPlanLegs').value = String(S.plan.legs);
     $('inPlanHaz').value = S.plan.haz;
     $('inScenario').value = S.scenario;
+    $('customBox').hidden = !(weld && S.scenario === 'kustom') || locks.scenario;
+    if (!$('customBox').hidden && UT.renderCustomEditor) UT.renderCustomEditor();
     $('scenarioDesc').textContent = !weld ? 'Skenario cacat hanya berlaku pada benda uji las.'
       : locks.scenario ? 'Mode ujian: cacat dirahasiakan sampai jawaban dikirim.' : UT.findScenario(S.scenario).desc;
     $('inIndType').value = S.indType;
@@ -1621,7 +1623,9 @@
     get training() { return training; },
     set training(v) { training = v; },
     rand,
-    rebuild, setSpecimen, syncControls, newProbe, clearDac, resetSizing, setGain, renderSizing,
+    rebuild, setSpecimen, syncControls, newProbe, clearDac, resetSizing, setGain, renderSizing, renderDac,
+    /** Pasang kebenaran probe dari sesi tersimpan. */
+    setH(h) { H = Object.assign({}, h); S._prevAngle = S.angle; rebuild(false); },
     applyUserFromTruth, userIndexX, cal,
     setSide,
     setTechnique,

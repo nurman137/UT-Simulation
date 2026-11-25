@@ -236,7 +236,7 @@
     // reflektor geometri: akar (sudut antara permukaan dalam brace dan chord) & kaki las
     corners.push({ x: sec.Rt[0], z: sec.Rt[1], s: 1.6, kind: 'akar', tx: sec.dc[0], tz: sec.dc[1], nrmx: sec.nch[0], nrmz: sec.nch[1] });
     corners.push({ x: sec.C[0], z: sec.C[1], s: 0.8, kind: 'kaki', tx: sec.dc[0], tz: sec.dc[1], nrmx: sec.nch[0], nrmz: sec.nch[1] });
-    (TUB_DEF[scenario] || []).forEach((d) => {
+    (Array.isArray(scenario) ? scenario : TUB_DEF[scenario] || []).forEach((d) => {
       // rentang y relatif ke posisi probe (agar rentang yang melewati 0 tetap benar)
       let y1 = phiToY(J, d.phi[0]), y2 = phiToY(J, d.phi[1]);
       const yp = ((yProbe % circ) + circ) % circ;
@@ -273,12 +273,46 @@
         }
         truth.push(Object.assign({ type: 'porositas', where: 'las' }, base));
       }
+      // kebenaran untuk penilaian: rentang kedalaman & posisi X di penampang ini
+      const xsT = pts.length ? pts.map((p) => p[0]) : circles.slice(-6).map((c) => c.x);
+      const zsT = pts.length ? pts.map((p) => p[1]) : circles.slice(-6).map((c) => c.z);
+      Object.assign(truth[truth.length - 1], { x1: Math.min(...xsT), x2: Math.max(...xsT), z1: Math.min(...zsT), z2: Math.max(...zsT) });
       if (pts.length === 2) {
         polys.push(Object.assign({ pts, two: true }, base));
         UT.samplePolyline(points, pts, Object.assign({ two: true, refl: 1 }, base));
       }
     });
     return { points, corners, shapes: { polys, circles, gaps: [] }, truth, ipRanges: [], rootBead: false };
+  };
+
+  /** Cacat tubular acak (ditentukan kode soal), tersebar di sekeliling brace tanpa tumpang tindih. */
+  UT.tubRandomDefs = function (seed, count) {
+    const rnd = UT.rng((seed * 2654435761) ^ 0x7b);
+    const R = (a, b) => a + rnd() * (b - a);
+    const n = Math.max(1, Math.min(4, count || 1));
+    const pool = ['lofB', 'lofC', 'root', 'toeC', 'poro'];
+    for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+    const w = 340 / n, start = R(10, 20);
+    return pool.slice(0, n).map((kind, i) => {
+      const a0 = start + i * w, span = Math.min(w - 8, R(18, 40));
+      const p0 = R(a0, a0 + w - 4 - span);
+      const d = { kind, phi: [p0, p0 + span] };
+      if (kind === 'lofB') Object.assign(d, { f0: R(0.05, 0.25), f1: R(0.55, 0.85) });
+      if (kind === 'lofC') Object.assign(d, { f0: R(0.05, 0.25), f1: R(0.55, 0.85) });
+      if (kind === 'toeC') d.depth = R(0.2, 0.35);
+      return d;
+    });
+  };
+
+  /** Kebenaran cacat tubular (untuk penilaian): dihitung di tengah rentang φ tiap cacat. */
+  UT.tubTruth = function (spec) {
+    const defs = Array.isArray(spec.scenario) ? spec.scenario : TUB_DEF[spec.scenario] || [];
+    return defs.map((d) => {
+      const pm = (d.phi[0] + d.phi[1]) / 2;
+      const sec = UT.tubSection(spec.J, ((pm % 360) + 360) % 360);
+      const sc = UT.tubScene(spec.J, sec, [d], phiToY(spec.J, pm));
+      return sc.truth[0];
+    });
   };
 
   /** Benda uji sambungan tubular (penampang lokal dibangun per posisi φ di main.js). */
@@ -293,7 +327,8 @@
     const tname = (UT.TUB_TYPES.find((t) => t.id === J.type) || UT.TUB_TYPES[0]).id;
     return {
       type: 'tubular', name: `Sambungan tubular ${tname}`, T: J.tb, xMin: -250, xMax: 40, yLen: 2 * Math.PI * J.r,
-      J, R: J.r, OD: 2 * J.r, scenario: S.tubScenario || 'none', grainAll: { n, xs, zs, ws },
+      J, R: J.r, OD: 2 * J.r, grainAll: { n, xs, zs, ws },
+      scenario: S.tubScenario === 'acak' ? UT.tubRandomDefs(S.tubSeed || 1, S.tubCount || 2) : S.tubScenario || 'none',
       scene: { points: [], corners: [], shapes: { polys: [], circles: [], gaps: [] }, truth: [], ipRanges: [], rootBead: false },
       marks: {}, holes: [],
     };

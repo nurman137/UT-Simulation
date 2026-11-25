@@ -98,7 +98,7 @@
   function buildWeldSpecimen(S) {
     const weld = UT.buildWeld(S);
     const yLen = UT.weldYLen(S);
-    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen, gen: S.randGen || 2, pipe: S.geom === 'pipa' && !S.seam });
+    const scene = UT.buildScene(weld, S.scenario, { seed: S.randSeed, count: S.randCount, yLen, gen: S.randGen || 2, pipe: S.geom === 'pipa' && !S.seam, custom: S.custom });
     const spec = {
       type: 'las', name: 'Las', T: weld.T, xMin: -weld.P, xMax: weld.P,
       yLen, weld, scene,

@@ -87,6 +87,14 @@ Acuan: ASME Sec. V Art. 4 · Bahasa: Indonesia · Platform: web (HTML + JavaScri
 - [ ] Kriteria penerimaan tubular AWS D1.1 Class R / Class X — perlu tabel dari dokumen resmi
 - [ ] Skew berkas 3D & kelengkungan chord di penampang lokal — ditunda
 
-## v1.0
-- [ ] Validasi kualitatif terhadap data alat nyata dan review praktisi NDT Level II/III
-- [ ] Rilis di GitHub Pages
+## v1.0 – Alat instruktur & rilis ✅
+- [x] Ujian di pelat, pipa girth, pipa seam, tubular; jumlah cacat, batas waktu, kode paket ujian
+- [x] Editor skenario instruktur (file & kode bagikan), dipakai sebagai soal ujian
+- [x] Laporan inspeksi format standar dengan sketsa lokasi
+- [x] Simpan & buka sesi
+- [x] Panduan pengguna ID/EN (HTML + PDF), aksesibilitas, performa HP lama
+
+## v1.1 (menunggu masukan)
+- [ ] Kriteria standar dari dokumen resmi: cek ulang tabel AWS D1.1 non-tubular, tubular Class R/X, opsi ISO 11666/5817
+- [ ] Validasi amplitudo terhadap data alat nyata dan review praktisi NDT Level II/III
+- [ ] Tag rilis v1.0 & GitHub Pages

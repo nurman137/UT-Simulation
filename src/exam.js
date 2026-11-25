@@ -73,12 +73,70 @@
   UT.combineScore = (report, proc) => (proc ? 0.7 * report.score + 0.3 * proc.score : report.score);
 
   /** Parameter soal dari kode (seed) dan tingkat kesulitan. */
-  UT.makeExam = function (seed, levelId) {
+  UT.EXAM_SPECIMENS = [
+    { id: 'pelat', name: 'Pelat las' },
+    { id: 'girth', name: 'Pipa – las girth' },
+    { id: 'seam', name: 'Pipa – las memanjang (seam)' },
+    { id: 'tubular', name: 'Sambungan tubular T/Y/K/X' },
+  ];
+
+  /**
+   * Parameter soal dari kode (seed), tingkat, dan pengaturan instruktur.
+   * opts: { specimen: 'pelat'|'girth'|'seam'|'tubular', count, minutes, custom: [defs] | null }
+   * Kode lama (tanpa opts) menghasilkan soal pelat yang sama seperti sebelumnya.
+   */
+  UT.makeExam = function (seed, levelId, opts) {
+    const o = opts || {};
     const level = UT.EXAM_LEVELS.find((l) => l.id === levelId) || UT.EXAM_LEVELS[0];
     const rnd = UT.rng((seed * 7919) ^ 0xa5a5);
     const thicknesses = [12, 16, 20, 25];
     const T = thicknesses[Math.floor(rnd() * thicknesses.length)];
-    return { seed, level, T, count: level.count };
+    const specimen = UT.EXAM_SPECIMENS.some((s) => s.id === o.specimen) ? o.specimen : 'pelat';
+    const custom = specimen === 'pelat' && o.custom && o.custom.length ? UT.cleanCustom(o.custom) : null;
+    const count = custom ? custom.length : Math.max(1, Math.min(4, o.count || level.count));
+    const ex = { seed, level, T, count, specimen, minutes: Math.max(0, Math.min(240, +o.minutes || 0)), custom };
+    if (specimen === 'girth' || specimen === 'seam') {
+      ex.OD = [168.3, 219.1, 323.9][Math.floor(rnd() * 3)];
+      ex.T = ex.OD < 200 ? Math.min(T, 12) : Math.min(T, 20);
+    }
+    if (specimen === 'tubular') {
+      ex.tubType = ['T', 'Y', 'K', 'X'][Math.floor(rnd() * 4)];
+      ex.tubTheta = ex.tubType === 'T' ? 90 : [45, 60][Math.floor(rnd() * 2)];
+      ex.tubTb = [10, 12][Math.floor(rnd() * 2)];
+      ex.T = ex.tubTb;
+    }
+    return ex;
+  };
+
+  /** Pengaturan state benda uji untuk soal (dipakai saat ujian dimulai dan saat dinilai ulang). */
+  UT.examState = function (ex) {
+    const base = { bevelType: 'V', bevelHalf: 30, rootGap: 2, rootFace: 1.5, cap: true, rootBead: true, randGen: 2, seam: false, geom: 'pelat' };
+    if (ex.specimen === 'tubular') {
+      return Object.assign(base, { specimen: 'tubular', tubType: ex.tubType, tubTheta: ex.tubTheta, tubD: 323.9, tubTc: 16, tubd: 168.3,
+        tubTb: ex.tubTb, tubGap: 25, tubScenario: 'acak', tubSeed: ex.seed, tubCount: ex.count, T: ex.tubTb });
+    }
+    return Object.assign(base, {
+      specimen: 'las', T: ex.T, scenario: ex.custom ? 'kustom' : 'acak', custom: ex.custom || [], randSeed: ex.seed, randCount: ex.count,
+      geom: ex.specimen === 'pelat' ? 'pelat' : 'pipa', OD: ex.OD || 168.3, seam: ex.specimen === 'seam',
+    });
+  };
+
+  /** Kode paket ujian (UTX1:…) berisi kode soal + pengaturan instruktur, untuk dibagikan ke siswa. */
+  UT.examPackCode = function (p) {
+    const o = { c: p.code, l: p.level, s: p.specimen || 'pelat', n: p.count || 0, m: p.minutes || 0 };
+    if (p.custom && p.custom.length) o.k = UT.customToCode(p.custom);
+    const json = JSON.stringify(o);
+    return 'UTX1:' + (typeof btoa === 'function' ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, 'utf8').toString('base64'));
+  };
+  UT.examPackFrom = function (code) {
+    const m = String(code || '').trim().match(/^UTX1:([A-Za-z0-9+/=]+)$/);
+    if (!m) throw new Error('kode paket ujian tidak dikenali');
+    const o = JSON.parse(typeof atob === 'function' ? decodeURIComponent(escape(atob(m[1]))) : Buffer.from(m[1], 'base64').toString('utf8'));
+    return {
+      code: Math.max(1, Math.round(+o.c) || 1), level: UT.EXAM_LEVELS.some((l) => l.id === o.l) ? o.l : 'mudah',
+      specimen: UT.EXAM_SPECIMENS.some((s) => s.id === o.s) ? o.s : 'pelat', count: +o.n || 0, minutes: +o.m || 0,
+      custom: o.k ? UT.customFromCode(o.k) : null,
+    };
   };
 
   /** Kode soal acak 4–5 digit. */

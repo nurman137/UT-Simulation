@@ -22,6 +22,8 @@
   // ujian
   let exam = null; // { code, level, T, start, submitted, result, elapsed }
   let examLevel = 'mudah';
+  // pengaturan instruktur untuk ujian
+  const examOpt = { specimen: 'pelat', count: 0, minutes: 0, source: 'acak' };
   let examCode = UT.randomExamCode(app.rand);
 
   // ================================================================ aktivitas
@@ -148,6 +150,17 @@
             <label class="small">Kode soal <input id="examCode" type="number" min="1" max="99999" value="${examCode}"></label>
             <button type="button" class="btn" data-a="newCode">Kode baru</button>
             <p class="muted small">Kode yang sama menghasilkan soal yang sama. Instruktur bisa membagikan satu kode ke semua siswa.</p>
+            <div class="examopts">
+              <label class="small">Benda uji soal <select id="exSpec">${UT.EXAM_SPECIMENS.map((s) => `<option value="${s.id}"${s.id === examOpt.specimen ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+              <label class="small">Jumlah cacat <select id="exCount"><option value="0">sesuai tingkat</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${n === examOpt.count ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+              <label class="small">Batas waktu (menit, 0 = bebas) <input id="exMin" type="number" min="0" max="240" step="5" value="${examOpt.minutes}"></label>
+              <label class="small">Sumber soal <select id="exSrc"><option value="acak"${examOpt.source === 'acak' ? ' selected' : ''}>Acak dari kode soal</option><option value="kustom"${examOpt.source === 'kustom' ? ' selected' : ''}>Skenario instruktur (pelat)</option></select></label>
+            </div>
+            <p class="muted small">Skenario instruktur memakai cacat dari editor skenario (kartu Cacat &amp; tampilan, skenario “Skenario instruktur”).</p>
+            <div class="btnrow"><button type="button" class="btn" data-a="packMake">Buat kode paket ujian</button>
+              <label class="small">Kode paket <input id="exPack" type="text" size="22" placeholder="UTX1:…"></label>
+              <button type="button" class="btn" data-a="packUse">Pakai paket</button></div>
+            <p id="exPackMsg" class="small"></p>
             <label class="small">Nama <input id="examName" type="text" maxlength="60" value="${esc($('inStudent').value)}" placeholder="nama siswa"></label>
             <button type="button" class="btn primary" data-a="startExam">Mulai ujian</button>
           </div>
@@ -155,8 +168,8 @@
     }
     if (!exam.submitted) {
       return `<div class="edu-head"><b>Ujian berjalan</b>
-        <span class="small">kode <b>${exam.code}</b> · tingkat <b>${esc(exam.level.name)}</b> · T = ${exam.T} mm ·
-        ${exam.level.count === 1 ? '1 cacat' : 'jumlah cacat dirahasiakan'} · ⏱ <b id="examTimer">00:00</b></span>
+        <span class="small">kode <b>${exam.code}</b> · tingkat <b>${esc(exam.level.name)}</b> · ${esc((UT.EXAM_SPECIMENS.find((x) => x.id === exam.specimen) || {}).name || '')} · T = ${exam.T} mm ·
+        ${exam.count === 1 ? '1 cacat' : 'jumlah cacat dirahasiakan'} · ⏱ <b id="examTimer">00:00</b>${exam.minutes ? ` <span class="muted">(batas ${exam.minutes} menit)</span>` : ''}</span>
         <span class="btnrow"><button type="button" class="btn primary" data-a="submitExam">Kirim jawaban</button>
         <button type="button" class="btn" data-a="cancelExam">Batalkan</button></span></div>
         <ol class="small examsteps">
@@ -202,16 +215,18 @@
     if (name) $('inStudent').value = name;
     const lvEl = panel.querySelector('input[name=lvl]:checked');
     examLevel = lvEl ? lvEl.value : examLevel;
-    const ex = UT.makeExam(code, examLevel);
+    readExamOpts();
+    if (examOpt.source === 'kustom' && !(S.custom && S.custom.length)) { window.alert('Skenario instruktur masih kosong. Susun cacat di editor skenario dulu.'); return; }
+    const ex = UT.makeExam(code, examLevel, { specimen: examOpt.specimen, count: examOpt.count, minutes: examOpt.minutes, custom: examOpt.source === 'kustom' ? S.custom : null });
     app.setTechnique('ut');
     app.setMaterial('cs');
     app.setWave('T');
+    const st = UT.examState(ex);
     Object.assign(S, {
-      bevelType: 'V', geom: 'pelat', contour: false, asmeCurved: false, rootFace: 1.5, code: 'asme', awsB: null, _angleBefore: null, dual: false,
-      T: ex.T, bevelHalf: 30, rootGap: 2, cap: true, rootBead: true,
-      scenario: 'acak', randSeed: code, randCount: ex.count, randGen: 2, showDefects: false,
-      probeY: 150, side: 'kiri', angle: 60, freq: 4, crystal: 10, velocity: C.material.vT, gateLevel: 20, probeX: null,
-    });
+      contour: true, asmeCurved: false, code: 'asme', awsB: null, _angleBefore: null, dual: false, orient: 'tegak',
+      showDefects: false, probeY: st.specimen === 'tubular' ? 0 : 150, side: 'kiri', angle: 60, freq: 4, crystal: 10,
+      velocity: C.material.vT, gateLevel: 20, probeX: null,
+    }, st);
     app.locks.truth = app.locks.scenario = app.locks.autoCal = true;
     app.training = ex.level.training;
     if (ex.level.process) app.newProbe(UT.rng((code * 104729) ^ 0x3c3c)); // galat probe dari kode soal
@@ -227,9 +242,18 @@
     rowsLocked = false;
     renderRows();
     S.specimen = 'x';
-    app.setSpecimen('las');
-    exam = { code, level: ex.level, T: ex.T, start: Date.now(), submitted: false };
+    app.setSpecimen(st.specimen);
+    exam = { code, level: ex.level, T: ex.T, start: Date.now(), submitted: false, specimen: ex.specimen, count: ex.count, minutes: ex.minutes, custom: ex.custom };
     renderPanel();
+  }
+
+  function readExamOpts() {
+    if (!$('exSpec')) return;
+    examOpt.specimen = $('exSpec').value;
+    examOpt.count = +$('exCount').value || 0;
+    examOpt.minutes = Math.max(0, Math.min(240, +$('exMin').value || 0));
+    examOpt.source = $('exSrc').value;
+    if (examOpt.source === 'kustom') examOpt.specimen = 'pelat';
   }
 
   function cancelExam(rerender = true) {
@@ -238,11 +262,12 @@
     if (rerender) renderPanel();
   }
 
-  function submitExam() {
-    if (!rows.length && !window.confirm('Laporan indikasi masih kosong. Tetap kirim?')) return;
-    if (rows.length && !window.confirm(`Kirim ${rows.length} indikasi untuk dinilai?`)) return;
+  function submitExam(auto) {
+    if (!auto && !rows.length && !window.confirm('Laporan indikasi masih kosong. Tetap kirim?')) return;
+    if (!auto && rows.length && !window.confirm(`Kirim ${rows.length} indikasi untuk dinilai?`)) return;
     exam.elapsed = Date.now() - exam.start;
-    exam.result = UT.gradeExam(app.spec.scene.truth, rows, { t: exam.T });
+    const truth = app.spec.type === 'tubular' ? UT.tubTruth(app.spec) : app.spec.scene.truth;
+    exam.result = UT.gradeExam(truth, rows, { t: exam.T });
     let process = null;
     if (exam.level.process) {
       process = {
@@ -260,6 +285,7 @@
     exam.record = UT.buildResultRecord({
       student: $('inStudent').value.trim(), code: exam.code, levelId: exam.level.id, T: exam.T, gen: 2,
       date: new Date().toLocaleString('id-ID'), elapsedMs: exam.elapsed, rows, result: exam.result, process,
+      specimen: exam.specimen, count: exam.count, minutes: exam.minutes, custom: exam.custom,
     });
     rowsLocked = true;
     app.locks.truth = false;
@@ -271,8 +297,17 @@
 
   let lastTimer = '';
   function examTick() {
-    if (activity !== 'ujian' || !exam || exam.submitted) return;
-    const t = fmtTime(Date.now() - exam.start);
+    if (!exam || exam.submitted) return;
+    const used = Date.now() - exam.start;
+    if (exam.minutes && used >= exam.minutes * 60000) {
+      // waktu habis: jawaban dikirim otomatis
+      if (activity !== 'ujian') setActivity('ujian');
+      submitExam(true);
+      window.alert('Waktu ujian habis. Jawaban dikirim otomatis.');
+      return;
+    }
+    if (activity !== 'ujian') return;
+    const t = exam.minutes ? `${fmtTime(used)} / sisa ${fmtTime(exam.minutes * 60000 - used)}` : fmtTime(used);
     if (t !== lastTimer) {
       lastTimer = t;
       const el = $('examTimer');
@@ -420,15 +455,52 @@
     renderRows();
   }
 
+  // Data laporan (proyek, prosedur, peralatan) disimpan di S.reportInfo (ikut tersimpan di sesi)
+  function syncRepInfo() {
+    S.reportInfo = S.reportInfo || {};
+    document.querySelectorAll('#repInfo [data-ri]').forEach((el) => { el.value = S.reportInfo[el.dataset.ri] || ''; });
+  }
+  $('repInfo').addEventListener('input', (e) => {
+    const k = e.target.dataset.ri;
+    if (!k) return;
+    S.reportInfo = S.reportInfo || {};
+    S.reportInfo[k] = e.target.value.slice(0, 80);
+  });
+  syncRepInfo();
+
+  /** Deskripsi benda uji untuk laporan sesuai jenisnya. */
+  function specimenDesc() {
+    const sp = app.spec;
+    const bevel = (UT.BEVEL_TYPES.find((b) => b.id === S.bevelType) || {}).name || S.bevelType;
+    if (sp.type === 'tubular') {
+      const J = sp.J;
+      return `Sambungan tubular ${J.type}: chord Ø${(2 * J.R).toFixed(1)} × ${J.Tc} mm, brace Ø${(2 * J.r).toFixed(1)} × ${J.tb} mm${J.type === 'T' ? '' : `, θ = ${J.theta}°`}${J.type === 'K' ? `, gap ${J.gap} mm` : ''}`;
+    }
+    if (sp.type === 'las') {
+      const geo = S.geom === 'pipa' ? `Pipa OD ${S.OD} mm, las ${S.seam ? 'memanjang (seam)' : 'girth'}` : 'Pelat, las lurus';
+      return `${geo}; bevel ${bevel}, ½ sudut ${S.bevelHalf}°, root gap ${S.rootGap} mm, T = ${sp.T} mm`;
+    }
+    return (UT.SPECIMENS.find((x) => x.id === S.specimen) || {}).name || sp.name;
+  }
+
   function reportData() {
     const ref = UT.dacRefGain(app.dac);
+    const sp = app.spec;
+    const tub = sp.type === 'tubular';
     return {
+      info: Object.assign({}, S.reportInfo || {}),
+      specimenDesc: specimenDesc(),
+      standard: S.code === 'aws' ? 'AWS D1.1 (struktur, beban statis)' : 'ASME Sec. V Art. 4 / Sec. VIII Div. 1 App. 12',
+      technique: S.technique === 'paut' ? 'Phased Array' : S.technique === 'tofd' ? 'TOFD' : 'UT konvensional (pulse-echo)',
+      awsB: S.code === 'aws' ? S.awsB : null,
+      sketch: { kind: tub ? 'tubular' : 'linear', length: sp.yLen || UT.CONFIG.weldLength, r: tub ? sp.J.r : null,
+        half: tub ? 20 : sp.weld ? sp.weld.capHalf : 10, rows: rows.slice() },
       student: $('inStudent').value.trim(),
       date: new Date().toLocaleString('id-ID'),
       mode: exam ? 'Ujian' : activity === 'tutorial' ? 'Tutorial' : 'Latihan',
       code: exam ? exam.code : S.scenario === 'acak' ? S.randSeed : '',
       level: exam ? exam.level.name : '',
-      specimen: { T: app.spec.type === 'las' ? app.spec.T : S.T, bevel: S.bevelHalf, material: C.material.name },
+      specimen: { T: app.spec.T, bevel: S.bevelHalf, material: C.material.name },
       probe: { angle: S.angle, freq: S.freq, crystal: S.crystal },
       cal: { xValue: S.xValue, angleUser: S.angleUser, zero: S.zero, velocity: S.velocity },
       dac: {
@@ -461,6 +533,8 @@
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
   const safeName = (s) => (s || 'siswa').replace(/[^\w\-]+/g, '_');
+  UT.saveFile = saveFile;
+  UT.safeName = safeName;
 
   function downloadReport() {
     saveFile(UT.trHTML ? UT.trHTML(UT.buildReportHTML(reportData())) : UT.buildReportHTML(reportData()), 'text/html', `laporan-ut-${safeName($('inStudent').value.trim())}.html`);
@@ -494,6 +568,24 @@
       lastStatus = '';
     } else if (a === 'newCode') { examCode = UT.randomExamCode(app.rand); $('examCode').value = examCode; }
     else if (a === 'startExam') startExam();
+    else if (a === 'packMake') {
+      readExamOpts();
+      const code = Math.max(1, Math.round(parseFloat($('examCode').value) || examCode));
+      const lv = panel.querySelector('input[name=lvl]:checked');
+      const pk = UT.examPackCode({ code, level: lv ? lv.value : examLevel, specimen: examOpt.specimen, count: examOpt.count, minutes: examOpt.minutes, custom: examOpt.source === 'kustom' ? S.custom : null });
+      $('exPack').value = pk;
+      $('exPackMsg').textContent = 'Bagikan kode paket ini ke siswa; siswa menempelnya lalu menekan “Pakai paket”.';
+      if (navigator.clipboard) navigator.clipboard.writeText(pk).catch(() => {});
+    } else if (a === 'packUse') {
+      try {
+        const pk = UT.examPackFrom($('exPack').value);
+        examCode = pk.code; examLevel = pk.level;
+        Object.assign(examOpt, { specimen: pk.specimen, count: pk.count, minutes: pk.minutes, source: pk.custom ? 'kustom' : 'acak' });
+        if (pk.custom) S.custom = pk.custom;
+        renderPanel();
+        $('exPackMsg').textContent = 'Paket ujian dipakai. Tekan “Mulai ujian”.';
+      } catch (err) { $('exPackMsg').textContent = err.message; }
+    }
     else if (a === 'submitExam') submitExam();
     else if (a === 'cancelExam') { if (window.confirm('Batalkan ujian?')) cancelExam(); }
     else if (a === 'newExam') { exam = null; examCode = UT.randomExamCode(app.rand); unlockAll(); renderPanel(); }
@@ -543,8 +635,62 @@
 
   app.frameHooks.push(tutorialTick, examTick);
 
+  // ================================================================ simpan & buka sesi
+  UT.SESSION_TYPE = 'ut-simulator/sesi';
+  /** Data sesi: pengaturan, kebenaran probe, kalibrasi, DAC, sizing, dan laporan. */
+  function sessionData() {
+    const st = {};
+    Object.keys(S).forEach((k) => { const v = S[k]; if (typeof v !== 'function') st[k] = v; });
+    return {
+      type: UT.SESSION_TYPE, version: C.version, savedAt: new Date().toISOString(),
+      S: JSON.parse(JSON.stringify(st)), H: Object.assign({}, app.H), training: !!app.training,
+      dac: JSON.parse(JSON.stringify(app.dac)), sizing: Object.assign({}, app.sizing),
+      rows: JSON.parse(JSON.stringify(rows)), student: $('inStudent').value,
+    };
+  }
+  function restoreSession(o) {
+    if (!o || o.type !== UT.SESSION_TYPE || !o.S) throw new Error('bukan file sesi simulator');
+    const keep = new Set(Object.keys(C.defaults).concat(Object.keys(S)));
+    Object.keys(o.S).forEach((k) => { if (keep.has(k)) S[k] = o.S[k]; });
+    app.training = !!o.training;
+    app.setH(o.H);
+    app.dac = o.dac && Array.isArray(o.dac.points) ? o.dac : UT.dacCreate();
+    Object.assign(app.sizing, o.sizing || {});
+    rows.length = 0;
+    (Array.isArray(o.rows) ? o.rows : []).slice(0, 50).forEach((r) => rows.push(r));
+    rowsLocked = false;
+    $('inStudent').value = o.student || '';
+    syncRepInfo();
+    app.rebuild();
+    app.syncControls();
+    app.renderDac();
+    app.renderSizing();
+    renderRows();
+  }
+  const examRunning = () => exam && !exam.submitted;
+  $('btnSave').addEventListener('click', () => {
+    if (examRunning()) { window.alert('Sesi tidak bisa disimpan saat ujian berjalan.'); return; }
+    saveFile(JSON.stringify(sessionData(), null, 1), 'application/json', `sesi-ut-${safeName($('inStudent').value.trim())}.json`);
+  });
+  $('btnOpen').addEventListener('click', () => {
+    if (examRunning()) { window.alert('Sesi tidak bisa dibuka saat ujian berjalan.'); return; }
+    $('inSession').click();
+  });
+  $('inSession').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const o = JSON.parse(await f.text());
+      if (activity !== 'bebas') setActivity('bebas');
+      restoreSession(o);
+    } catch (err) { window.alert(`${f.name}: ${err.message}`); }
+  });
+
   UT.edu = {
+    sessionData, restoreSession,
     reportRows: () => rows,
+    reportHTML: () => UT.buildReportHTML(reportData()),
     get activity() { return activity; },
     get exam() { return exam; },
     setActivity,

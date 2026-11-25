@@ -14,7 +14,23 @@ menyimpan semua berkasnya di perangkat. Setelah sekali dibuka, simulator tetap b
 dipasang sebagai aplikasi ("Install app" / "Tambahkan ke layar utama"). Saat membuka `index.html` langsung dari
 berkas (`file://`) aplikasi juga jalan, tetapi tanpa fitur pasang/offline otomatis.
 
+## Panduan pengguna
+
+- Bahasa Indonesia: [docs/panduan.html](docs/panduan.html) · [PDF](docs/Panduan-Simulator-UT-Las-v1.0.pdf)
+- English: [docs/guide-en.html](docs/guide-en.html) · [PDF](docs/Weld-UT-Simulator-Guide-v1.0.pdf)
+
 ## Fitur
+
+### v1.0 – Alat instruktur, laporan standar, sesi, rilis
+- **Ujian di berbagai benda uji**: pelat, pipa girth, pipa memanjang (seam), sambungan tubular T/Y/K/X; jumlah cacat,
+  **batas waktu** (jawaban terkirim otomatis), sumber soal acak atau **skenario instruktur**, dan **kode paket ujian**
+  (`UTX1:…`) untuk dibagikan ke siswa. Rekap kelas menilai ulang semua jenis soal.
+- **Editor skenario instruktur**: susun cacat sendiri (9 jenis), unduh/impor file, bagikan lewat kode `UTS1:…`.
+- **Laporan inspeksi format standar**: informasi umum, benda uji, prosedur & acuan, peralatan, kalibrasi, indikasi,
+  **sketsa lokasi**, kesimpulan otomatis, tanda tangan; bahasa Indonesia/Inggris.
+- **Simpan & buka sesi** (.json): pengaturan, probe, kalibrasi, DAC, sizing, data laporan, dan tabel indikasi.
+- **Panduan pengguna** ID/EN (HTML + PDF), aksesibilitas (axe-core tanpa pelanggaran), simulasi sinyal ±3× lebih cepat
+  (tabel pulsa) untuk HP lama.
 
 ### v0.9 – Sambungan tubular T, Y, K, X
 - Benda uji baru **Sambungan tubular**: chord & brace (OD, tebal), sudut brace θ, gap K, brace di sisi bawah untuk X.
@@ -201,6 +217,7 @@ src/raypath.js          lintasan berkas umum: pipa seam (anulus), pembelokan ber
 src/corrosion.js        pelat korosi, probe dual (TR), A-scan permukaan bawah tidak rata, tebal echo pertama
 src/tubular.js          sambungan tubular T/Y/K/X: geometri 3D, Ψ lokal, penampang lokal, penelusur sinar, cacat
 src/render-tubular.js   tampilan 3D sambungan dan penampang lokal
+src/editor.js           editor skenario instruktur (UI)
 src/i18n.js             pilihan bahasa (kamus, pola, frasa; DOM, kanvas, dialog, laporan)
 src/i18n-lessons-en.js  terjemahan Inggris pelajaran tutorial
 src/imaging.js          B-scan, S-scan Phased Array, simulasi TOFD, akuisisi progresif
@@ -215,6 +232,7 @@ src/render-ascan.js     gambar layar A-scan
 src/main.js             state, kontrol UI, interaksi, loop render
 tests/run.js            unit test geometri, fisika, kalibrasi, DAC, ujian, laporan
 docs/ROADMAP.md         rencana pengembangan
+docs/panduan.html       panduan pengguna (ID) · docs/guide-en.html (EN) · PDF
 manifest.webmanifest    data aplikasi terpasang (PWA)
 sw.js                   service worker: cache berkas untuk mode offline (ganti nama cache tiap rilis)
 icons/                  ikon aplikasi

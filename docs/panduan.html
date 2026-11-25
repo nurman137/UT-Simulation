@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panduan Simulator UT Las v1.0</title>
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+<header>
+  <h1>Panduan Simulator UT Las <span>v1.0</span></h1>
+  <p class="sub">Simulator edukasi Ultrasonic Testing (UT) untuk inspeksi las · acuan ASME Sec. V Art. 4 · <a href="guide-en.html">English version</a></p>
+</header>
+
+<h2>1. Memulai</h2>
+<ul>
+  <li><b>Membuka</b>: buka <code>index.html</code> di Chrome/Edge/Firefox, atau alamat GitHub Pages simulator. Tidak perlu instalasi atau server.</li>
+  <li><b>Tanpa internet</b>: setelah sekali dibuka lewat http(s), simulator tersimpan di perangkat dan tetap berjalan offline. Di HP pilih <i>Tambahkan ke layar utama</i>.</li>
+  <li><b>Bahasa</b>: tombol <b>EN/ID</b> di kanan atas mengganti seluruh tampilan, tutorial, dan laporan.</li>
+  <li><b>Data</b>: laporan, sesi, dan rekap kelas hanya tersimpan di perangkat pengguna (file atau penyimpanan browser).</li>
+</ul>
+
+<h2>2. Tampilan</h2>
+<table>
+  <tr><th>Bagian</th><th>Fungsi</th></tr>
+  <tr><td>Aktivitas</td><td>Bebas, Tutorial, Ujian, Rekap kelas.</td></tr>
+  <tr><td>Benda uji</td><td>Las (pelat/pipa), blok IIW V1, blok V2, blok kalibrasi dasar ASME, pelat korosi, sambungan tubular.</td></tr>
+  <tr><td>Teknik</td><td>UT konvensional, Phased Array (S-scan/E-scan, fokus), TOFD.</td></tr>
+  <tr><td>Tampilan scanning</td><td>Penampang dengan probe, berkas −6 dB, gate, dan posisi echo menurut alat. Seret probe atau klik lalu pakai tombol panah (← → melintang, ↑ ↓ sepanjang las; Shift = 5 mm).</td></tr>
+  <tr><td>Tampak atas / 3D</td><td>Posisi probe sepanjang las; untuk tubular berupa tampilan 3D untuk memilih posisi keliling φ.</td></tr>
+  <tr><td>A-scan &amp; pembacaan</td><td>Amplitudo, %DAC atau rating AWS, SP, kedalaman, jarak permukaan, posisi, leg, evaluasi.</td></tr>
+</table>
+
+<h2>3. Alur kerja inspeksi</h2>
+<ol>
+  <li><b>Kalibrasi probe</b> (tombol <i>Probe baru</i> memberi probe dengan galat tersembunyi): di blok IIW V1/V2 cari echo R100 (V2: R25/R50) maksimum → isi X-value; atur zero (dan velocity) sampai echo tepat 100/200 mm; cek sudut dengan lubang Ø50 (V1), Ø1,5 (70°–80°) atau Ø5 (V2) → isi sudut terukur.</li>
+  <li><b>DAC</b> di blok kalibrasi dasar ASME: maksimalkan SDH ¼T, ½T, ¾T, lalu lewat leg 2; rekam tiap titik tanpa mengubah gain. Tekan <i>Gain = reference</i>, lalu <i>Gain scanning (+6 dB)</i>. TCG opsional.</li>
+  <li><b>Scan las</b> dari kedua sisi dan sepanjang las. Atur Gate A agar melingkupi echo.</li>
+  <li><b>Sizing</b>: panjang dengan 6 dB drop (puncak 80% → tandai ujung saat 40%), tinggi dengan 6 dB drop atau TOFD.</li>
+  <li><b>Evaluasi</b>: pilih acuan ASME Sec. VIII Div. 1 App. 12 atau AWS D1.1 (reference b dari lubang Ø1,5 blok IIW sisi B), pilih interpretasi indikasi.</li>
+  <li><b>Laporan</b>: <i>+ Tambah dari pembacaan saat ini</i>, lengkapi <i>Data laporan</i> (proyek, prosedur, alat, couplant, …), lalu cetak/PDF atau unduh .html.</li>
+</ol>
+
+<h2>4. Benda uji khusus</h2>
+<ul>
+  <li><b>Pipa</b>: las girth (posisi jam) atau memanjang/seam (penampang keliling; sudut maksimum menurut t/D). Gunakan <i>Wedge dikontur</i> dan blok kalibrasi lengkung untuk diameter kecil.</li>
+  <li><b>Baja austenitik</b>: noise butir tinggi; bandingkan gelombang geser dan longitudinal, aktifkan <i>Anisotropi logam las</i> untuk melihat pembelokan berkas.</li>
+  <li><b>Pelat korosi</b>: probe lurus 0° tunggal atau dual (TR), C-scan peta tebal, klik peta untuk memindahkan probe.</li>
+  <li><b>Sambungan tubular T/Y/K/X</b>: pilih posisi keliling φ (heel 0°, toe 180°); penampang lokal mengikuti sudut dihedral Ψ; baris info menunjukkan sudut probe ideal; B-scan keliling brace.</li>
+</ul>
+
+<h2>5. Tutorial (17 pelajaran)</h2>
+<p>1 Dasar A-scan · 2 Kalibrasi IIW · 3 DAC · 4 Sizing &amp; evaluasi ASME · 5 Blok V2 · 6 TOFD · 7 Phased Array S-scan · 8 Pipa &amp; austenitik · 9 Cacat melintang (scan sejajar) · 10 Probe lurus &amp; laminasi · 11 Rencana scan &amp; cakupan · 12 Korosi &amp; probe dual · 13 PAUT fokus &amp; E-scan · 14 Pipa seam &amp; anisotropi · 15 AWS D1.1 · 16 Tubular: sudut dihedral &amp; zona · 17 Tubular K &amp; X.</p>
+<p>Setiap langkah dicek otomatis; tombol <i>Lanjut</i> aktif setelah langkah berhasil. Beberapa langkah berupa kuis pembacaan alat.</p>
+
+<h2>6. Ujian &amp; rekap kelas</h2>
+<ul>
+  <li><b>Tingkat</b>: Mudah (DAC disediakan), Sedang (buat DAC), Sulit (kalibrasi probe + DAC), Praktik lengkap (proses kalibrasi, DAC, gain scanning ikut dinilai 30%).</li>
+  <li><b>Pengaturan instruktur</b>: benda uji soal (pelat, pipa girth, pipa seam, tubular), jumlah cacat, batas waktu (jawaban terkirim otomatis saat waktu habis), sumber soal (acak dari kode atau skenario instruktur).</li>
+  <li><b>Kode paket ujian</b> (<code>UTX1:…</code>): instruktur menekan <i>Buat kode paket ujian</i> dan membagikannya; siswa menempel kode lalu <i>Pakai paket</i>.</li>
+  <li><b>Penilaian</b>: deteksi 40, lokasi 15, panjang 15, jenis 15, keputusan 15 per cacat; −10 per indikasi palsu.</li>
+  <li><b>Rekap kelas</b>: impor file hasil (.json) atau laporan (.html) siswa; nilai dihitung ulang dari kode soal; statistik dan unduh CSV.</li>
+</ul>
+
+<h2>7. Alat instruktur</h2>
+<ul>
+  <li><b>Editor skenario</b>: pada kartu <i>Cacat &amp; tampilan</i> pilih skenario <i>Skenario instruktur (kustom)</i>, susun cacat (jenis, sisi, posisi y, kedalaman, x), tekan <i>Terapkan</i>. Simpan sebagai file atau bagikan lewat kode <code>UTS1:…</code>.</li>
+  <li><b>Soal dari skenario</b>: di tab Ujian pilih <i>Sumber soal: Skenario instruktur</i>, lalu buat kode paket ujian.</li>
+  <li><b>Mode guru</b>: centang <i>Tampilkan cacat &amp; exit point sebenarnya</i> (terkunci selama ujian).</li>
+</ul>
+
+<h2>8. Simpan &amp; buka sesi</h2>
+<p>Tombol <b>Simpan sesi</b> menyimpan pengaturan, probe, kalibrasi, DAC, sizing, data laporan, dan tabel indikasi ke file <code>.json</code>; <b>Buka sesi</b> memulihkannya. Tidak tersedia selama ujian berjalan.</p>
+
+<h2>9. Model &amp; batasan</h2>
+<ul>
+  <li>Penampang 2D dengan lintasan sinar (pantulan di permukaan datar/lengkung), amplitudo dari penjumlahan koheren titik-titik permukaan cacat, profil berkas Gaussian, atenuasi, penyebaran berkas, noise butir.</li>
+  <li>Amplitudo bersifat kualitatif dan belum divalidasi terhadap alat tertentu. Tubular memakai penampang lokal (tanpa skew berkas 3D). Tabel AWS D1.1 disusun untuk edukasi; kriteria tubular Class R/X belum dimasukkan.</li>
+  <li>Simulator <b>tidak menggantikan</b> latihan dengan alat dan spesimen nyata; laporan yang dihasilkan bukan dokumen inspeksi resmi.</li>
+</ul>
+</body>
+</html>

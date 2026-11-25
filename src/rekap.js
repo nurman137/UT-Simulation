@@ -54,6 +54,8 @@
       score: Math.round(o.result.score * 10) / 10,
       rows: cleanRows(o.rows),
       process: cleanProcess(o.process),
+      specimen: o.specimen || 'pelat', count: o.count || null, minutes: o.minutes || 0,
+      custom: o.custom && o.custom.length ? UT.cleanCustom(o.custom) : null,
     };
   };
 
@@ -80,22 +82,24 @@
       gen: obj.gen === 2 ? 2 : 1, // file tanpa 'gen' berasal dari v0.3–v0.5
       T: num(obj.T), date: String(obj.date || '').slice(0, 40), elapsedMs: Math.max(0, +obj.elapsedMs || 0),
       score: num(obj.score), rows: cleanRows(obj.rows), process: cleanProcess(obj.process),
+      specimen: UT.EXAM_SPECIMENS && UT.EXAM_SPECIMENS.some((s) => s.id === obj.specimen) ? obj.specimen : 'pelat',
+      count: obj.count ? Math.max(1, Math.min(8, Math.round(+obj.count))) : null,
+      minutes: Math.max(0, +obj.minutes || 0),
+      custom: Array.isArray(obj.custom) && obj.custom.length ? UT.cleanCustom(obj.custom) : null,
     };
   };
 
   /** Cacat sebenarnya untuk satu kode soal + tingkat (sama persis dengan soal yang dikerjakan). */
-  UT.examTruth = function (code, levelId, gen) {
-    const ex = UT.makeExam(code, levelId);
-    const S = Object.assign({}, UT.CONFIG.defaults, {
-      specimen: 'las', T: ex.T, scenario: 'acak', randSeed: code, randCount: ex.count,
-      bevelType: 'V', geom: 'pelat', bevelHalf: 30, rootGap: 2, cap: true, rootBead: true, randGen: gen || 2,
-    });
-    return { ex, truth: UT.buildSpecimen(S).scene.truth };
+  UT.examTruth = function (code, levelId, gen, opts) {
+    const ex = UT.makeExam(code, levelId, opts);
+    const S = Object.assign({}, UT.CONFIG.defaults, UT.examState(ex), { randGen: gen || 2 });
+    const spec = UT.buildSpecimen(S);
+    return { ex, truth: spec.type === 'tubular' ? UT.tubTruth(spec) : spec.scene.truth };
   };
 
   /** Nilai ulang sebuah catatan hasil dari laporan indikasinya. */
   UT.regradeRecord = function (rec) {
-    const { ex, truth } = UT.examTruth(rec.code, rec.level, rec.gen || 1);
+    const { ex, truth } = UT.examTruth(rec.code, rec.level, rec.gen || 1, { specimen: rec.specimen, count: rec.count, custom: rec.custom });
     const res = UT.gradeExam(truth, rec.rows, { t: ex.T });
     if (ex.level.process) {
       const proc = rec.process ? UT.gradeProcess(Object.assign({ T: ex.T }, rec.process)) : { score: 0, parts: { kalibrasi: 0, dac: 0, gain: 0 }, notes: ['data proses tidak ada'] };

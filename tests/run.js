@@ -812,5 +812,46 @@ test('tubular: cacat hanya memberi echo di rentang φ-nya', () => {
   assert.ok(amp(0) > 20 * amp(90), 'di heel ada, di sisi tidak');
 });
 
+// ---- v1.0
+test('skenario instruktur: semua jenis cacat terbangun, kode bagikan bolak-balik', () => {
+  UT.CUSTOM_TYPES.forEach((t) => {
+    const sp = weldFor({ scenario: 'kustom', custom: [{ type: t.id, side: 'kanan', y1: 50, y2: 80, z1: 5, z2: 12, x: 2 }] });
+    assert.strictEqual(sp.scene.truth.length, 1, t.id);
+    assert.ok(sp.scene.points.length > 10, t.id);
+  });
+  const defs = [{ type: 'lof', side: 'kiri', y1: 80, y2: 110, z1: 6, z2: 12, x: 0 }, { type: 'slag', side: 'kiri', y1: 190, y2: 205, z1: 9, z2: 11, x: 1 }];
+  assert.deepStrictEqual(UT.customFromCode(UT.customToCode(defs)), UT.cleanCustom(defs));
+  assert.throws(() => UT.customFromCode('xyz'));
+});
+test('ujian: kode lama tetap sama; benda uji pipa/tubular dan skenario instruktur dinilai ulang dengan benar', () => {
+  assert.deepStrictEqual(UT.makeExam(555, 'mudah').T, UT.makeExam(555, 'mudah', {}).T);
+  ['pelat', 'girth', 'seam', 'tubular'].forEach((sp) => {
+    const { ex, truth } = UT.examTruth(4321, 'sedang', 2, { specimen: sp, count: 3 });
+    assert.strictEqual(truth.length, 3, sp);
+    const rows = truth.map((t) => ({ y1: t.y1, y2: t.y2, depth: (t.z1 + t.z2) / 2, x: (t.x1 + t.x2) / 2, pctDAC: 150, type: t.type, verdict: UT.expectedVerdict(t, 150, ex.T) }));
+    const rec = UT.buildResultRecord({ student: 's', code: 4321, levelId: 'sedang', T: ex.T, gen: 2, rows, result: { score: 100 }, specimen: sp, count: 3 });
+    const rg = UT.regradeRecord(UT.parseResultFile(JSON.stringify(rec)));
+    near(rg.result.score, 100, 0.01, sp);
+    assert.strictEqual(rg.status, 'cocok', sp);
+  });
+  const custom = [{ type: 'crack', side: 'kiri', y1: 60, y2: 90, z1: 5, z2: 11, x: 0 }];
+  const { truth } = UT.examTruth(7, 'mudah', 2, { specimen: 'pelat', custom });
+  assert.strictEqual(truth.length, 1);
+  assert.strictEqual(truth[0].type, 'retak');
+});
+test('ujian: kode paket bolak-balik', () => {
+  const p = UT.examPackFrom(UT.examPackCode({ code: 4321, level: 'sulit', specimen: 'tubular', count: 3, minutes: 30 }));
+  assert.deepStrictEqual([p.code, p.level, p.specimen, p.count, p.minutes, p.custom], [4321, 'sulit', 'tubular', 3, 30, null]);
+  const q = UT.examPackFrom(UT.examPackCode({ code: 9, level: 'mudah', specimen: 'pelat', custom: [{ type: 'lof', side: 'kanan', y1: 10, y2: 40, z1: 3, z2: 9, x: 0 }] }));
+  assert.strictEqual(q.custom.length, 1);
+});
+test('laporan: memuat data laporan, sketsa lokasi, dan kesimpulan', () => {
+  const html = UT.buildReportHTML({ student: 'a', date: 'd', mode: 'Latihan', info: { proyek: 'P-1', noLaporan: 'UT-9' }, specimenDesc: 'Pelat', standard: 'ASME',
+    specimen: { T: 20, material: 'Baja karbon' }, probe: { angle: 60, freq: 4, crystal: 10 }, cal: { xValue: 10, angleUser: 60, zero: 11, velocity: 3240 },
+    dac: { refGain: null, points: [] }, indications: [{ y1: 10, y2: 30, depth: 5, x: -2, pctDAC: 120, type: 'lof', verdict: 'tolak' }],
+    sketch: { kind: 'linear', length: 300, half: 8, rows: [{ y1: 10, y2: 30, x: -2, verdict: 'tolak' }] } });
+  ['P-1', 'UT-9', '<svg', 'DITOLAK'].forEach((k) => assert.ok(html.includes(k), k));
+});
+
 console.log(`\n${passed} lulus, ${failed} gagal`);
 process.exit(failed ? 1 : 0);
